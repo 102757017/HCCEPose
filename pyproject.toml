@@ -1,0 +1,83 @@
+[project]
+name = "app"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies =[
+    "bpy==3.6.0",
+    "cython==3.2.1",
+    "diffrp-nvdiffrast>=0.3.3.1",
+    "fvcore==0.1.5.post20221221",
+    "glumpy>=1.2.1",
+    "h5py==3.15.1",
+    "huggingface-hub[hf-transfer]==0.36.0",
+    "imageio==2.37.2",
+    "imgaug>=0.4.0",
+    "kasal-6d==0.1.3",
+    "kiwisolver==1.4.9",
+    "kornia==0.6.9",
+    "mathutils<5.0.0",
+    "matplotlib==3.10.7",
+    "ninja==1.11.1.1",
+    "numpy==1.26.4",
+    "open3d==0.19.0",
+    "opencv-contrib-python==4.9.0.80",
+    "opencv-python==4.9.0.80",
+    "pillow==11.3.0",
+    "pybind11==2.12.0",
+    "pyopengl>=3.1.0",
+    "pypng>=0.20220715.0",
+    "pyrender>=0.1.45",
+    "pytz>=2026.2",
+    "rich==14.2.0",
+    "scipy==1.15.3",
+    "setuptools",    
+    "tensorboard>=2.20.0",
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+    "torchvision==0.23.0",
+    "tqdm>=4.66.5",
+    "transformations==2024.6.1",
+    "triangle>=20250106",
+    "trimesh==4.2.2",
+    "ultralytics==8.3.162",
+    "vispy>=0.16.1",
+    "wheel", 
+	"pyvirtualdisplay",
+]
+
+[tool.uv]
+# 允许使用预编译的 wheel
+compile-bytecode = true
+# 指定当前平台为 Windows AMD64
+required-environments = [
+    "sys_platform == 'win32' and platform_machine == 'AMD64'"
+]
+
+# 显式告诉 uv，在编译 glumpy 之前，必须先在隔离环境里装好这几个包
+[tool.uv.extra-build-dependencies]
+glumpy = ["setuptools", "numpy", "cython", "wheel"]
+# 针对缺失现代构建系统的旧包关闭构建隔离
+no-build-isolation-package = ["glumpy"]
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
+torchaudio = { index = "pytorch" }
+bpy = { index = "blender" }
+
+[[tool.uv.index]]
+name = "blender"
+url = "https://download.blender.org/pypi/"
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+
+[dependency-groups]
+train =[
+    "bpy==3.6.0",
+    "kasal-6d==0.1.3",
+    "polyscope<2.4.0",
+]

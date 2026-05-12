@@ -1,3 +1,10 @@
+#1 在MeshLab中顶点着色
+#2 在MeshLab中修复法线
+#3 将模型定位点移动到原点
+#4 导出ply并根据 BOP 规范重命名文件，组织数据集结构
+
+
+
 # Author: Yulin Wang (yulinwang@seu.edu.cn)
 # School of Mechanical Engineering, Southeast University, China
 

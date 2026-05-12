@@ -22,7 +22,7 @@ import json
 import shutil
 from tqdm import tqdm
 from PIL import Image 
-from ultralytics.data.utils import autosplit
+from ultralytics.data.split import autosplit
 
 def convert_train_pbr_2_yolo(train_pbr_path, output_path, obj_id_list):
     '''

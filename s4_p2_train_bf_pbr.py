@@ -1,3 +1,4 @@
+%%writefile s4_p2_train_bf_pbr.py
 # Author: Yulin Wang (yulinwang@seu.edu.cn)
 # School of Mechanical Engineering, Southeast University, China
 
@@ -142,47 +143,40 @@ if __name__ == '__main__':
     
     ide_debug = True
     
-    # Specify the path to the dataset folder.
     # 指定数据集文件夹的路径。
-    dataset_path = '/root/xxxxxx/demo-tex-objs'
+    dataset_path = './demo-bin-picking'
     
-    # Specify the name of the subfolder in the dataset used for loading training data.
     # 指定数据集中用于加载训练数据的子文件夹名称。
     train_folder_name = 'train_pbr'
     
-    # The range of object IDs for training.  
-    # `start_obj_id` is the starting object ID, and `end_obj_id` is the ending object ID.
+
     # 训练的物体 ID 范围。  
     # `start_obj_id` 为起始物体 ID，`end_obj_id` 为终止物体 ID。
     start_obj_id = 1
-    end_obj_id =5
+    end_obj_id =1
     
-    # Total number of training epochs.
     # 总训练轮数。
     total_iteration = 50001
     
-    # Learning rate.
     # 学习率。
     lr = 0.0002
+
     
-    # Number of samples per training epoch.
     # 每轮训练的样本数量。
     batch_size = 24
     
-    # Number of worker processes used by the DataLoader.
     # DataLoader 的进程数量。
     num_workers = 12
     
-    # The number of epochs between saving checkpoints.
+
     # 保存检查点的间隔轮数。
     log_freq = 500
     
-    # Scaling ratio for 2D bounding boxes.
+
     # 2D 包围盒的缩放比例。
     padding_ratio = 1.5
     
 
-    # Whether to enable EfficientNet.
     # 是否启用 EfficientNet。
     efficientnet_key = None
     

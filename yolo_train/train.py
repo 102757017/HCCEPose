@@ -19,6 +19,7 @@ import os
 import sys
 import argparse
 from ultralytics import YOLO
+import torch
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
@@ -41,9 +42,12 @@ def train_yolo11(task, data_path, gpu_num, epochs, imgsz, batch):
         final_model_path (str): Path where the trained model is saved.
     """
 
-    device = []
-    for i_ in range(int(gpu_num)):
-        device.append(i_)
+    if torch.cuda.is_available():
+        device = [i_ for i_ in range(int(gpu_num))]
+        print(f"Using GPU(s): {device}")
+    else:
+        device = 'cpu'
+        print("CUDA not available, falling back to CPU.")
     
     if task == "detection":
         pretrained_weights = "yolo11x.pt"

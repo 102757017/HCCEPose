@@ -137,22 +137,6 @@ def convert_train_pbr_2_yolo(train_pbr_path, output_path, obj_id_list):
             annotated_only=False 
         )
 
-    # 将 autosplit 生成的绝对路径转换为相对于 output_path 的相对路径
-    data_root = output_path
-    for split_file in ['autosplit_train.txt', 'autosplit_val.txt']:
-        file_path = os.path.join(data_root, split_file)
-        if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
-                lines = f.readlines()
-            new_lines = []
-            for line in lines:
-                abs_path = line.strip()
-                if abs_path:
-                    rel_path = os.path.relpath(abs_path, start=data_root)
-                    new_lines.append(rel_path + '\n')
-            with open(file_path, 'w') as f:
-                f.writelines(new_lines)
-            print(f"[INFO] Converted {split_file} to relative paths.")
 
 def generate_yaml(output_path, obj_id_list):
     
@@ -198,22 +182,15 @@ def generate_yaml(output_path, obj_id_list):
     names = []
     for obj_id_ in obj_id_list:
         names.append(f"{obj_id_}")
-    if val_path is not None:
-        yaml_content = {
-            "train": train_path,
-            "val": val_path,
-            "nc": len(obj_id_list),
-            "names": names 
-        }
-    else:
-        data_root = output_path  # output_path 就是 .../yolo11/train_obj_s
-        yaml_content = {
-            "path": data_root,
-            "train": "autosplit_train.txt",
-            "val": "autosplit_val.txt",
-            "nc": len(obj_id_list),
-            "names": names
-        }
+
+    abs_output_path = os.path.abspath(output_path)
+    yaml_content = {
+        "path": abs_output_path,
+        "train": "images",      # 直接指向 images 目录
+        "val": "images",        # 也指向 images 目录，Ultralytics 会自动按比例划分
+        "nc": len(obj_id_list),
+        "names": names
+    }
     with open(yaml_path, "w") as f:
         for key, value in yaml_content.items():
             f.write(f"{key}: {value}\n")

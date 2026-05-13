@@ -1,5 +1,4 @@
 #!/bin/bash
-git clone https://github.com/102757017/HCCEPose.git
 cd ./HCCEPose
 
 # Unzip toolkits

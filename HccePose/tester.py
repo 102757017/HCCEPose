@@ -343,11 +343,12 @@ class Tester():
             show_op = hccepose_vis
         self.show_op = show_op
         self.CUDA_DEVICE = CUDA_DEVICE
+        # Device selection: CPU fallback if CUDA not available
         if torch.cuda.is_available():
-            self.device = device = torch.device("cuda:%s"%CUDA_DEVICE)
+            self.device = torch.device("cuda:%s"%CUDA_DEVICE)
             print("GPU is available. Using GPU.")
         else:
-            self.device = device = torch.device("cpu")
+            self.device = torch.device("cpu")
             print("GPU is not available. Using CPU.")
 
         self.foundationpose_registered = False
@@ -380,7 +381,7 @@ class Tester():
 
         self.model_yolo = YOLO(os.path.join(bop_dataset_item.dataset_path, 'yolo11', 
                                             'train_obj_s', 'detection', 'obj_s', 
-                                            'yolo11-detection-obj_s.pt')).to(device).eval()
+                                            'yolo11-detection-obj_s.pt')).to(self.device).eval()
 
         BBox_3d = []
         for key_i in self.bop_dataset_item.model_info:
@@ -418,18 +419,21 @@ class Tester():
         self.HccePose_Runtime_Item = {}
         for obj_id in bop_dataset_item.obj_id_list:
             obj_info = bop_dataset_item.obj_info_list[bop_dataset_item.obj_id_list.index(obj_id)]
-            min_xyz = torch.from_numpy(np.array([obj_info['min_x'], obj_info['min_y'], obj_info['min_z']],dtype=np.float32)).to('cuda:'+CUDA_DEVICE)
-            size_xyz = torch.from_numpy(np.array([obj_info['size_x'], obj_info['size_y'], obj_info['size_z']],dtype=np.float32)).to('cuda:'+CUDA_DEVICE)
+            # Move tensors to the selected device (CPU or GPU)
+            min_xyz = torch.from_numpy(np.array([obj_info['min_x'], obj_info['min_y'], obj_info['min_z']], dtype=np.float32)).to(self.device)
+            size_xyz = torch.from_numpy(np.array([obj_info['size_x'], obj_info['size_y'], obj_info['size_z']], dtype=np.float32)).to(self.device)
 
             HccePose_BF_Net_i = HccePose_BF_Net(efficientnet_key=efficientnet_key, 
                                                 min_xyz = min_xyz, 
                                                 size_xyz = size_xyz)
-            if torch.cuda.is_available():
-                HccePose_BF_Net_i=HccePose_BF_Net_i.to('cuda:'+CUDA_DEVICE)
-                HccePose_BF_Net_i.eval()
+            # Always move to the selected device (CPU or GPU) and set eval mode
+            HccePose_BF_Net_i = HccePose_BF_Net_i.to(self.device)
+            HccePose_BF_Net_i.eval()
             best_save_path = os.path.join(bop_dataset_item.dataset_path, 'HccePose', 'obj_%s'%str(obj_id).rjust(2, '0'), 'best_score')
             checkpoint_path_i = get_checkpoint(best_save_path)
-            info_i = load_checkpoint(best_save_path, HccePose_BF_Net_i, CUDA_DEVICE=CUDA_DEVICE)
+            # Pass device identifier (string) to load_checkpoint: if CPU, use 'cpu'; otherwise use the CUDA index string
+            device_arg = 'cpu' if self.device.type == 'cpu' else self.CUDA_DEVICE
+            info_i = load_checkpoint(best_save_path, HccePose_BF_Net_i, CUDA_DEVICE=device_arg)
             self.HccePose_Item[obj_id] = HccePose_BF_Net_i
             self.HccePose_Item_info[obj_id] = info_i
             if self.acceleration in ['onnx', 'tensorrt']:
@@ -441,7 +445,7 @@ class Tester():
                     HccePose_BF_Net_i,
                     checkpoint_path_i,
                     cache_dir_i,
-                    device=str(device),
+                    device=str(self.device),  # use self.device (e.g., 'cuda:0' or 'cpu')
                     obj_id=obj_id,
                     input_size=self.crop_size,
                     provider=self.acceleration,
@@ -616,8 +620,9 @@ class Tester():
         import yaml
         from Refinement.refinement_group import Refinement_FP
 
-        if not torch.cuda.is_available():
-            raise RuntimeError('FoundationPose registration requires CUDA in the current tester integration.')
+        # FoundationPose currently requires CUDA; raise error if CPU only
+        if self.device.type != 'cuda':
+            raise RuntimeError('FoundationPose registration requires CUDA. CPU mode is not supported by FoundationPose.')
 
         refine_config_path, refine_checkpoint_path = self._resolve_foundationpose_paths(foundationpose_refine_dir)
         score_config_path, score_checkpoint_path = self._resolve_foundationpose_paths(foundationpose_score_dir)
@@ -948,7 +953,9 @@ class Tester():
         
         img_torch = img_torch[None]
 
-        with torch.amp.autocast('cuda'):
+        # Use autocast only for CUDA (CPU autocast is not fully supported)
+        autocast_ctx = torch.amp.autocast('cuda') if self.device.type == 'cuda' else torch.no_grad()
+        with autocast_ctx:
             t1 = time.time()
             stage_times = {
                 'yolo': 0.0,

@@ -1531,13 +1531,15 @@ def load_checkpoint(check_point_path, net : HccePose_BF_Net, optimizer=None, loc
     iteration_step = 0
     keypoints_ = []
     try:
-        checkpoint = torch.load( get_checkpoint(check_point_path), map_location='cuda:'+CUDA_DEVICE, weights_only=False)
+        map_loc = 'cpu' if CUDA_DEVICE == 'cpu' else f'cuda:{CUDA_DEVICE}'
+        checkpoint = torch.load(get_checkpoint(check_point_path), map_location=map_loc, weights_only=False)
         net.load_state_dict(checkpoint['model_state_dict'])
         if optimizer is not None:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         best_score = checkpoint['best_score']
         iteration_step = checkpoint['iteration_step']
         keypoints_ = checkpoint['keypoints_']
+        keypoints_ = checkpoint.get('keypoints_', [])
     except:
         if local_rank == 0:
             print('no checkpoint !')

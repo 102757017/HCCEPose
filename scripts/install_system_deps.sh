@@ -9,6 +9,3 @@ apt-get install -y libsm6 libxrender1 libxext-dev
 
 #jupyter中要使用虚拟显示器
 apt-get install -y xvfb
-
-#下载 FreeImage 的动态链接库并安装到 imageio 的插件目录
-python -c "import imageio; imageio.plugins.freeimage.download()"

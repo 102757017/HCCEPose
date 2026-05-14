@@ -5,9 +5,9 @@ chmod +x s2_p1_gen_pbr_data.sh
 ./s2_p1_gen_pbr_data.sh \
     --gpu_id 0 \
     --scene_num 2 \
-    --cc0textures /kaggle/working/HCCEPose/cc0textures-512 \
+    --cc0textures ../cc0textures-512 \
     --dataset_path ./demo-bin-picking \
-    --script_path /kaggle/working/HCCEPose/s2_p1_gen_pbr_data.py | grep -v "Rendering frame"
+    --script_path ../s2_p1_gen_pbr_data.py | grep -v "Rendering frame"
 
 #cd demo-bin-picking
 #python ..\s2_p1_gen_pbr_data.py --gpu_id 0 --cc0textures "E:/python/HCCEPose/cc0textures-512" --scene_num 2

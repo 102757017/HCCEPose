@@ -7,7 +7,10 @@ unzip -o blenderproc.zip
 
 
 pip install uv
+which python
+#设置环境变量让uv使用conda的环境，而不是自己的.venv，不同平台要根据上面python的路径进行调整
 export UV_PROJECT_ENVIRONMENT="/opt/conda"
+#export UV_CACHE_DIR=/opt/conda/uv-cache
 uv sync --extra cuda --group train
 
 

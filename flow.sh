@@ -9,8 +9,6 @@ chmod +x s2_p1_gen_pbr_data.sh
     --dataset_path ./demo-bin-picking \
     --script_path ../s2_p1_gen_pbr_data.py | grep -v "Rendering frame"
 
-#cd demo-bin-picking
-#python ..\s2_p1_gen_pbr_data.py --gpu_id 0 --cc0textures "E:/python/HCCEPose/cc0textures-512" --scene_num 2
 
 #生成yolo数据集
 python s3_p1_prepare_yolo_label.py --dataset_path ./demo-bin-picking
@@ -24,4 +22,4 @@ python s4_p1_gen_bf_labels.py --dataset_path ./demo-bin-picking
 
 
 #训练 HccePose
-python -m torch.distributed.launch --nproc_per_node=2 s4_p2_train_bf_pbr_ddp.py --dataset_path ./demo-bin-picking
+python -m torch.distributed.launch --nproc_per_node=2 s4_p2_train_bf_pbr_ddp.py --dataset_path ./demo-bin-picking --start_obj_id 1 --end_obj_id 1 --total_iteration 10

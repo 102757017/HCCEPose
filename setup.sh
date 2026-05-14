@@ -10,7 +10,7 @@ pip install uv
 df -h
 #设置uv缓存在与 /kaggle/working/ 同一个文件系统的路径下，避免触发复制占满working目录
 export UV_CACHE_DIR=/home/jupyter/uv-cache
-uv sync --extra cuda --group train
+uv sync --extra cuda --group train --no-progress
 
 
 chmod 777 ./scripts/install_system_deps.sh

@@ -7,7 +7,8 @@ unzip -o blenderproc.zip
 
 
 pip install uv
-uv sync --extra cuda --group train --python /opt/conda/bin/python --no-progress
+export UV_PROJECT_ENVIRONMENT="/opt/conda"
+uv sync --extra cuda --group train
 
 
 chmod 777 ./scripts/install_system_deps.sh

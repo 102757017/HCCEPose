@@ -1,11 +1,14 @@
 #!/bin/bash
-cd ./HCCEPose
+cd HCCEPose
 
 # Unzip toolkits
 unzip -o bop_toolkit.zip
 unzip -o blenderproc.zip
 
-pip install -r requirements.txt
+
+pip install uv
+uv sync --extra cuda --group train --python /opt/conda/bin/python --no-progress
+
 
 chmod 777 ./scripts/install_system_deps.sh
 ./scripts/install_system_deps.sh

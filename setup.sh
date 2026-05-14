@@ -5,8 +5,7 @@ cd ./HCCEPose
 unzip -o bop_toolkit.zip
 unzip -o blenderproc.zip
 
-pip install uv
-uv pip install -r pyproject.toml --no-progress --system
+pip install -r requirements.txt
 
 chmod 777 ./scripts/install_system_deps.sh
 ./scripts/install_system_deps.sh

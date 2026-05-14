@@ -120,7 +120,7 @@ def parse_args():
     parser.add_argument('--test_ratio', type=float, default=0.01, help='从训练集中抽取用于测试的比例，默认 0.01')
     
     # 分布式参数（由 torchrun 或 launch 脚本自动传入）
-    parser.add_argument('--local_rank', type=int, default=-1, help='分布式训练时指定本地 GPU 序号，通常不需要手动设置')
+    parser.add_argument('--local-rank', type=int, default=-1, help='分布式训练时指定本地 GPU 序号，通常不需要手动设置')
     
     return parser.parse_args()
 

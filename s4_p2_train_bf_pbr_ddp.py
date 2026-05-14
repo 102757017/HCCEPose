@@ -129,8 +129,6 @@ if __name__ == '__main__':
     args = parse_args()
 
     # ------------------ 分布式环境初始化 ------------------
-    # 方式1：检查是否由 torchrun 启动（设置了 LOCAL_RANK 环境变量）
-    # 方式2：检查命令行参数 --local_rank（由 torch.distributed.launch 传入）
     if 'LOCAL_RANK' in os.environ:
         local_rank = int(os.environ['LOCAL_RANK'])
         world_size = int(os.environ['WORLD_SIZE'])
@@ -198,10 +196,19 @@ if __name__ == '__main__':
             os.makedirs(os.path.join(args.dataset_path, 'HccePose'), exist_ok=True)
             os.makedirs(save_path, exist_ok=True)
             os.makedirs(best_save_path, exist_ok=True)
+            
+        # [修复] 等待主进程将目录创建完毕后再让其他进程放行
+        if ddp_enabled:
+            dist.barrier()
 
         # 获取 3D 尺寸并移至当前 GPU
         min_xyz = torch.from_numpy(np.array([obj_info['min_x'], obj_info['min_y'], obj_info['min_z']], dtype=np.float32)).to('cuda:' + CUDA_DEVICE)
         size_xyz = torch.from_numpy(np.array([obj_info['size_x'], obj_info['size_y'], obj_info['size_z']], dtype=np.float32)).to('cuda:' + CUDA_DEVICE)
+
+        # [修复核心] 在多卡环境下，强制阻塞非主进程，让主进程先下载预训练权重。
+        # 避免多个进程同时下载覆盖相同文件导致的损坏与奔溃 (Exit code 1)。
+        if ddp_enabled and local_rank != 0:
+            dist.barrier()
 
         # 定义网络和损失
         loss_net = HccePose_Loss()
@@ -218,29 +225,38 @@ if __name__ == '__main__':
             min_xyz=min_xyz,
             size_xyz=size_xyz,
         )
+        
+        # [修复核心] 主进程下载完毕并实例化后，释放非主进程直接使用本地缓存
+        if ddp_enabled and local_rank == 0:
+            dist.barrier()
+
         net = net.to('cuda:' + CUDA_DEVICE)
         net_test = net_test.to('cuda:' + CUDA_DEVICE)
         optimizer = optim.Adam(net.parameters(), lr=args.lr)
 
-        # 尝试加载之前保存的检查点（仅主进程读取后 broadcast）
+        # [修复] 尝试加载之前保存的检查点：让"所有进程"统一执行加载以获取相同的 Optimizer 状态！
+        # （原代码仅在主进程加载，导致其他卡的动量状态不同步，产生训练发散）
         best_score = 0
         iteration_step = 0
-        if is_main_process:
-            try:
-                checkpoint_info = load_checkpoint(save_path, net, optimizer, local_rank=local_rank, CUDA_DEVICE=CUDA_DEVICE)
-                best_score = checkpoint_info['best_score']
-                iteration_step = checkpoint_info['iteration_step']
+        try:
+            checkpoint_info = load_checkpoint(save_path, net, optimizer, local_rank=local_rank, CUDA_DEVICE=CUDA_DEVICE)
+            best_score = checkpoint_info['best_score']
+            iteration_step = checkpoint_info['iteration_step']
+            if is_main_process:
                 print(f"加载检查点成功：iteration_step={iteration_step}, best_score={best_score}")
-            except Exception as e:
+        except Exception as e:
+            if is_main_process:
                 print('未找到检查点，从头开始训练', e)
-        # 广播起始状态到所有进程
+                
+        # 广播起始状态到所有进程 (确保参数在边界情况下的一致性)
         if ddp_enabled:
-            best_score_tensor = torch.tensor(best_score).to('cuda:' + CUDA_DEVICE)
+            best_score_tensor = torch.tensor(best_score, dtype=torch.float32).to('cuda:' + CUDA_DEVICE)
             dist.broadcast(best_score_tensor, src=0)
-            best_score = best_score_tensor.item()
-            iteration_step_tensor = torch.tensor(iteration_step).to('cuda:' + CUDA_DEVICE)
+            best_score = float(best_score_tensor.item())
+            
+            iteration_step_tensor = torch.tensor(iteration_step, dtype=torch.long).to('cuda:' + CUDA_DEVICE)
             dist.broadcast(iteration_step_tensor, src=0)
-            iteration_step = iteration_step_tensor.item()
+            iteration_step = int(iteration_step_tensor.item())
 
         # 转换为 DDP 模型
         if ddp_enabled:

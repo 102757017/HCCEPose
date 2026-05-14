@@ -7,7 +7,7 @@ unzip -o blenderproc.zip
 
 
 pip install uv
-uv pip install -r pyproject.toml --no-progress --system
+uv pip install -r pyproject_kaggle.toml --no-progress --system
 
 
 chmod 777 ./scripts/install_system_deps.sh

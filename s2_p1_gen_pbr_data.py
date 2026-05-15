@@ -34,6 +34,9 @@ if __name__ == '__main__':
     dataset_name = os.path.basename(current_dir)
     bop_parent_path = os.path.dirname(current_dir)
 
+    cachedir=os.path.join(os.getcwd(), 'cache')
+    os.makedirs(cachedir, exist_ok=True)
+
     # 加载物体信息
     models_info = load_json2dict(os.path.join(current_dir, 'models', 'models_info.json'))
 
@@ -85,8 +88,10 @@ if __name__ == '__main__':
 
     # 加载材质
     if os.path.basename(cc_textures_path) == 'cc0textures-512':
+        print("开始加载cc0textures-512材质")
         cc_textures = bproc.loader.load_512_ccmaterials(cc_textures_path, use_all_materials=True)
     else:
+        print("开始加载原版cc0textures材质")
         cc_textures = bproc.loader.load_ccmaterials(cc_textures_path, use_all_materials=True)
 
     def sample_pose_func(obj: bproc.types.MeshObject):
@@ -95,7 +100,7 @@ if __name__ == '__main__':
         obj.set_location(np.random.uniform(min_, max_))
         obj.set_rotation_euler(bproc.sampler.uniformSO3())
 
-    bproc.renderer.enable_depth_output(activate_antialiasing=False)
+    bproc.renderer.enable_depth_output(activate_antialiasing=False,output_dir=cachedir)
     bproc.renderer.set_max_amount_of_samples(50)
     bproc.renderer.set_render_devices(desired_gpu_device_type='CUDA', desired_gpu_ids=[gpu_id])
 
@@ -181,7 +186,7 @@ if __name__ == '__main__':
                 bproc.camera.add_camera_pose(cam2world_matrix, frame=cam_poses)
                 cam_poses += 1
 
-        data = bproc.renderer.render()
+        data = bproc.renderer.render(output_dir=cachedir)  #设置缓存路径，否则在windows上会将图片都缓存到C盘根目录下
         bproc.writer.write_bop(
             bop_parent_path,
             target_objects=sampled_target_bop_objs,

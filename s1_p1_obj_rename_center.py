@@ -1,120 +1,133 @@
-#python process_bop.py --input_ply input.ply --obj_id 1 --target_faces 3000
+# Author: Yulin Wang (yulinwang@seu.edu.cn)
+# School of Mechanical Engineering, Southeast University, China
 
-import os
-import shutil
-import argparse
-import pymeshlab as ml
+import os, shutil
+import pymeshlab as ml # pymeshlab==2023.12.post1
 import numpy as np
 
 def modify_ply_texture_filename(input_file, output_file, new_texture_name):
-    """
-    修改 PLY 文件中的纹理文件名。
-    """
+    ''' 
+    ---
+    ---
+    Modify the texture file name in a PLY file.
+    ---
+    ---
+    Args:
+        - input_file: Path to the input PLY file.
+        - output_file: Path to the output PLY file.
+        - new_texture_name: New file name for the texture image.
+
+    Returns:
+        None
+    ---
+    ---
+
+    修改 PLY 文件中纹理图的文件名。
+    ---
+    ---
+    参数:
+        - input_file: 输入 PLY 文件的路径。
+        - output_file: 输出 PLY 文件的路径。
+        - new_texture_name: 新的纹理图文件名。
+
+    返回:
+        无
+    '''
     try:
-        with open(input_file, 'r', encoding='utf-8', errors='ignore') as f:
+
+        # Open the PLY file
+        # 打开 PLY 文件
+        with open(input_file, 'r') as f:
             lines = f.readlines()
+        
+        # Locate the TextureFile and replace the old texture file name with the new one
+        # 查找 TextureFile，并将旧的纹理图名称替换为新的纹理图名称
         for i, line in enumerate(lines):
             if line.strip().startswith('comment TextureFile'):
                 lines[i] = f'comment TextureFile {new_texture_name}\n'
                 break
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, 'w') as f:
             f.writelines(lines)
-    except Exception as e:
-        print(f"修正纹理文件名时出错: {e}")
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='将 PLY 模型转换为 BOP 格式（减面、中心平移、计算法线、顶点着色）。')
-    parser.add_argument('--input_ply', type=str, required=True, help='输入的 PLY 文件路径。')
-    parser.add_argument('--obj_id', type=int, required=True, help='物体 ID。')
-    parser.add_argument('--output_ply', type=str, default=None, help='输出路径。若不指定，在输入目录下生成 obj_XXXXXX.ply')
-    parser.add_argument('--target_faces', type=int, default=10000, help='目标减面数（默认 10000 面）。')
-    return parser.parse_args()
+    except FileNotFoundError:
+        1
 
 if __name__ == '__main__':
-    args = parse_args()
 
-    input_ply = args.input_ply
-    obj_id = args.obj_id
+    # Provide the path to the input PLY file. 
+    # The script generates a corresponding BOP-format PLY file based on the given obj_id. 
+    # If the PLY file contains a texture image, a BOP-format texture file will also be generated.
+    # 输入 PLY 文件路径，脚本会根据 obj_id 生成符合 BOP 格式的对应 PLY 文件。
+    # 若 PLY 文件包含纹理图，脚本同时会生成符合 BOP 格式的纹理图文件。
 
-    # 保持原有的输出路径逻辑
-    if args.output_ply is None:
-        output_dir = os.path.dirname(input_ply)
-        output_ply = os.path.join(output_dir, f'obj_{obj_id:06d}.ply')
-    else:
-        output_ply = args.output_ply
+    input_ply = './demo-link-picking/models/link.ply'
+    obj_id = 1
+    output_ply = os.path.join(os.path.dirname(input_ply), 'obj_%s.ply'%str(obj_id).rjust(6, '0'))
 
-    # 1. 加载网格
-    ms = ml.MeshSet()
-    ms.load_new_mesh(input_ply)
-    m = ms.current_mesh()
-    print(f"原始面数: {m.face_number()}")
+    # Open the PLY file
+    # 打开 PLY 文件
+    mesh = ml.MeshSet()
+    mesh.load_new_mesh(input_ply)
 
-    # 2. 减面 (Simplification)
-    # 必须在计算法线前执行，因为减面会重新生成拓扑
-    if m.face_number() > args.target_faces:
-        print(f"正在进行减面，目标面数: {args.target_faces}...")
-        ms.simplification_quadric_edge_collapse_decimation(
-            targetfacenum=args.target_faces,
-            preserveboundary=True,
-            preservenormal=True
-        )
-        m = ms.current_mesh()
+    # Compute the normal vectors of the 3D model vertices
+    # 计算 3D 模型顶点的法向量
+    mesh.compute_normal_per_vertex()
+    mesh_c = mesh.current_mesh()
 
-    # 3. 纹理转顶点颜色 (Vertex Coloring)
-    # BOP 规范中，顶点着色 (Vertex Color) 兼容性最好
-    if m.has_wedge_tex_coord() or m.has_vertex_tex_coord():
-        print("将纹理颜色同步至顶点颜色...")
-        try:
-            ms.compute_color_from_texture_per_vertex()
-        except:
-            print("警告：顶点颜色转换失败。")
+    # Get the vertex matrix of the 3D model
+    # 获取 3D 模型的顶点矩阵
+    mesh_vertex_matrix = mesh_c.vertex_matrix().copy()
 
-    # 4. 平移模型到原点 (Centering)
-    # 重新获取减面后的包围盒中心
-    box = m.bounding_box()
-    center = box.center()
-    print(f"模型中心: {center}，正在移动到原点...")
-    ms.compute_matrix_from_translation_rotation_scale(
-        translationx=-center[0],
-        translationy=-center[1],
-        translationz=-center[2]
+    # Get the maximum and minimum values of the vertex matrix
+    # 获取顶点矩阵的最大值和最小值
+    vertex_min = np.min(mesh_vertex_matrix, axis = 0)
+    vertex_max = np.max(mesh_vertex_matrix, axis = 0)
+
+    # Compute the center of the 3D object model
+    # 计算物体模型的中心
+    vertex_center = (vertex_min + vertex_max) / 2
+
+    # Align the object model center with the coordinate system origin based on the computed center
+    # 根据计算得到的中心，将物体模型的中心对齐到坐标系原点
+    mesh.compute_matrix_from_translation_rotation_scale(
+        translationx = -vertex_center[0],
+        translationy = -vertex_center[1],
+        translationz = -vertex_center[2],
     )
 
-    # 5. 计算法线 (Normals)
-    # 在几何变形和减面完成后计算法线最为准确
-    print("重新计算顶点法线...")
-    ms.compute_normal_per_vertex()
+    # Check whether the object model contains a texture map
+    # 判断物体模型是否包含纹理图
+    if mesh_c.texture_number() > 0:
 
-    # 6. 保存和处理纹理
-    m = ms.current_mesh() # 刷新状态
-    if m.has_vertex_tex_coord() or m.has_wedge_tex_coord():
-        input_texture = input_ply.replace('.ply', '.png')
-        output_texture = output_ply.replace('.ply', '.png')
+        # If a texture map exists, copy and rename the texture file
+        # 若存在纹理图，则拷贝纹理图并重命名
+        if not os.path.exists(input_ply.replace('.ply', '.png')):
+            shutil.copy2(input_ply.replace('.ply', '.png'), output_ply.replace('.ply', '.png'))
         
-        # 复制纹理图片并重命名
-        if os.path.exists(input_texture):
-            shutil.copy2(input_texture, output_texture)
+        # Convert wedge UVs to vertex UVs
+        # 将 wedge UV 转换为 vertex UV
+        if mesh_c.has_wedge_tex_coord():
+            mesh.compute_texcoord_transfer_wedge_to_vertex()
         
-        # 保存带顶点颜色和法线的 PLY
-        ms.save_current_mesh(
-            output_ply,
-            binary=False,
-            save_vertex_normal=True,
-            save_vertex_color=True,
-            save_vertex_coord=True,
-            save_wedge_texcoord=False # 已转顶点颜色，可不保存 wedge 坐标
-        )
-        
-        # 修正 PLY 内部对纹理文件的引用
-        modify_ply_texture_filename(output_ply, output_ply, os.path.basename(output_texture))
+        # Save the PLY file with the associated texture map
+        # 保存带有纹理图的 PLY 文件
+        mesh.save_current_mesh(output_ply,
+                                binary = False, 
+                                save_vertex_normal = True,
+                                save_vertex_coord  = True,
+                                save_wedge_texcoord = False
+                                )
     else:
-        # 无纹理模式保存
-        ms.save_current_mesh(
-            output_ply,
-            binary=False,
-            save_vertex_normal=True,
-            save_vertex_color=True
-        )
+        # Save the PLY file without a texture map
+        # 保存无纹理图的 PLY 文件
+        mesh.save_current_mesh(output_ply,
+                                binary = False, 
+                                save_vertex_normal = True,
+                                )
+    # MeshLab cannot set the texture filename in PLY files
+    # Use `modify_ply_texture_filename` to correct the texture filename in the PLY file
+    # MeshLab 无法设置 PLY 文件中的纹理图名称
+    # 需要使用 `modify_ply_texture_filename` 来修正 PLY 文件中的纹理图名称
+    if mesh_c.texture_number() > 0:
+        modify_ply_texture_filename(output_ply, output_ply, os.path.basename(output_ply.replace('.ply', '.png')))
 
-    print(f"处理完成，输出路径: {output_ply}")
-    print(f"最终面数: {m.face_number()}")
+    pass

@@ -115,7 +115,7 @@ if __name__ == '__main__':
     CUDA_DEVICE = '0'
     hccepose_vis = True
     save_visualizations = hccepose_vis
-    print_stage_timing = False
+    print_stage_timing = True
 
     hccepose_acceleration_pytorch = 'pytorch'
     hccepose_acceleration_onnx = 'onnx'

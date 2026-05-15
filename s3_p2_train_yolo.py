@@ -91,7 +91,7 @@ if __name__ == '__main__':
             print("模型文件未找到，启动或恢复训练...")
             cmd = (
                 f"python {train_script} "
-                f"--data_path '{data_objs_path}' "
+                f"--data_path {data_objs_path} "
                 f"--epochs {epochs} "
                 f"--imgsz 640 "
                 f"--batch {batch_size} "

@@ -1,10 +1,4 @@
-#1 请提前在MeshLab中顶点着色
-#2 请提前在MeshLab中修复法线
-#3 请提前将模型定位点移动到原点
-#4 导出ply并根据 BOP 规范重命名文件，组织数据集结构
-
-
-
+#python process_bop.py --input_ply input.ply --obj_id 1 --target_faces 3000
 
 import os
 import shutil
@@ -15,29 +9,25 @@ import numpy as np
 def modify_ply_texture_filename(input_file, output_file, new_texture_name):
     """
     修改 PLY 文件中的纹理文件名。
-
-    参数:
-        input_file: 输入的 PLY 文件路径。
-        output_file: 输出的 PLY 文件路径。
-        new_texture_name: 新的纹理图片文件名。
     """
     try:
-        with open(input_file, 'r') as f:
+        with open(input_file, 'r', encoding='utf-8', errors='ignore') as f:
             lines = f.readlines()
         for i, line in enumerate(lines):
             if line.strip().startswith('comment TextureFile'):
                 lines[i] = f'comment TextureFile {new_texture_name}\n'
                 break
-        with open(output_file, 'w') as f:
+        with open(output_file, 'w', encoding='utf-8') as f:
             f.writelines(lines)
-    except FileNotFoundError:
-        pass
+    except Exception as e:
+        print(f"修正纹理文件名时出错: {e}")
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='将 PLY 模型转换为 BOP 格式（中心平移到原点、计算法线、处理纹理）。')
+    parser = argparse.ArgumentParser(description='将 PLY 模型转换为 BOP 格式（减面、中心平移、计算法线、顶点着色）。')
     parser.add_argument('--input_ply', type=str, required=True, help='输入的 PLY 文件路径。')
-    parser.add_argument('--obj_id', type=int, required=True, help='物体 ID（若未指定 --output_ply，则用于自动生成输出文件名）。')
-    parser.add_argument('--output_ply', type=str, default=None, help='输出的 PLY 文件路径。若不指定，将在输入文件同目录下自动生成为 "obj_XXXXXX.ply"。')
+    parser.add_argument('--obj_id', type=int, required=True, help='物体 ID。')
+    parser.add_argument('--output_ply', type=str, default=None, help='输出路径。若不指定，在输入目录下生成 obj_XXXXXX.ply')
+    parser.add_argument('--target_faces', type=int, default=10000, help='目标减面数（默认 10000 面）。')
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -46,61 +36,85 @@ if __name__ == '__main__':
     input_ply = args.input_ply
     obj_id = args.obj_id
 
-    # 若未指定输出路径，则自动生成
+    # 保持原有的输出路径逻辑
     if args.output_ply is None:
         output_dir = os.path.dirname(input_ply)
         output_ply = os.path.join(output_dir, f'obj_{obj_id:06d}.ply')
     else:
         output_ply = args.output_ply
 
-    # 加载网格
-    mesh = ml.MeshSet()
-    mesh.load_new_mesh(input_ply)
+    # 1. 加载网格
+    ms = ml.MeshSet()
+    ms.load_new_mesh(input_ply)
+    m = ms.current_mesh()
+    print(f"原始面数: {m.face_number()}")
 
-    # 计算顶点法线
-    mesh.compute_normal_per_vertex()
-    mesh_c = mesh.current_mesh()
+    # 2. 减面 (Simplification)
+    # 必须在计算法线前执行，因为减面会重新生成拓扑
+    if m.face_number() > args.target_faces:
+        print(f"正在进行减面，目标面数: {args.target_faces}...")
+        ms.simplification_quadric_edge_collapse_decimation(
+            targetfacenum=args.target_faces,
+            preserveboundary=True,
+            preservenormal=True
+        )
+        m = ms.current_mesh()
 
-    # 通过顶点包围盒计算模型中心
-    mesh_vertex_matrix = mesh_c.vertex_matrix().copy()
-    vertex_min = np.min(mesh_vertex_matrix, axis=0)
-    vertex_max = np.max(mesh_vertex_matrix, axis=0)
-    vertex_center = (vertex_min + vertex_max) / 2
+    # 3. 纹理转顶点颜色 (Vertex Coloring)
+    # BOP 规范中，顶点着色 (Vertex Color) 兼容性最好
+    if m.has_wedge_tex_coord() or m.has_vertex_tex_coord():
+        print("将纹理颜色同步至顶点颜色...")
+        try:
+            ms.compute_color_from_texture_per_vertex()
+        except:
+            print("警告：顶点颜色转换失败。")
 
-    # 平移模型，使中心位于原点
-    mesh.compute_matrix_from_translation_rotation_scale(
-        translationx=-vertex_center[0],
-        translationy=-vertex_center[1],
-        translationz=-vertex_center[2],
+    # 4. 平移模型到原点 (Centering)
+    # 重新获取减面后的包围盒中心
+    box = m.bounding_box()
+    center = box.center()
+    print(f"模型中心: {center}，正在移动到原点...")
+    ms.compute_matrix_from_translation_rotation_scale(
+        translationx=-center[0],
+        translationy=-center[1],
+        translationz=-center[2]
     )
 
-    # 处理纹理（若存在）
-    if mesh_c.texture_number() > 0:
-        # 若输入文件同目录下存在纹理图，则复制并重命名
+    # 5. 计算法线 (Normals)
+    # 在几何变形和减面完成后计算法线最为准确
+    print("重新计算顶点法线...")
+    ms.compute_normal_per_vertex()
+
+    # 6. 保存和处理纹理
+    m = ms.current_mesh() # 刷新状态
+    if m.has_vertex_tex_coord() or m.has_wedge_tex_coord():
         input_texture = input_ply.replace('.ply', '.png')
         output_texture = output_ply.replace('.ply', '.png')
-        if not os.path.exists(input_texture):
-            print(f"警告：未找到纹理文件 {input_texture}，跳过复制。")
-        else:
+        
+        # 复制纹理图片并重命名
+        if os.path.exists(input_texture):
             shutil.copy2(input_texture, output_texture)
-
-        # 将 wedge UV 转换为顶点 UV（如果需要）
-        if mesh_c.has_wedge_tex_coord():
-            mesh.compute_texcoord_transfer_wedge_to_vertex()
-
-        # 保存带纹理的 PLY 文件（不保存 wedge 纹理坐标）
-        mesh.save_current_mesh(output_ply,
-                               binary=False,
-                               save_vertex_normal=True,
-                               save_vertex_coord=True,
-                               save_wedge_texcoord=False)
-        # 修正 PLY 文件中的纹理文件名（MeshLab 无法直接设置此项）
-        modify_ply_texture_filename(output_ply, output_ply,
-                                    os.path.basename(output_texture))
+        
+        # 保存带顶点颜色和法线的 PLY
+        ms.save_current_mesh(
+            output_ply,
+            binary=False,
+            save_vertex_normal=True,
+            save_vertex_color=True,
+            save_vertex_coord=True,
+            save_wedge_texcoord=False # 已转顶点颜色，可不保存 wedge 坐标
+        )
+        
+        # 修正 PLY 内部对纹理文件的引用
+        modify_ply_texture_filename(output_ply, output_ply, os.path.basename(output_texture))
     else:
-        # 保存无纹理的 PLY 文件
-        mesh.save_current_mesh(output_ply,
-                               binary=False,
-                               save_vertex_normal=True)
+        # 无纹理模式保存
+        ms.save_current_mesh(
+            output_ply,
+            binary=False,
+            save_vertex_normal=True,
+            save_vertex_color=True
+        )
 
-    print(f"转换后的模型已保存至: {output_ply}")
+    print(f"处理完成，输出路径: {output_ply}")
+    print(f"最终面数: {m.face_number()}")

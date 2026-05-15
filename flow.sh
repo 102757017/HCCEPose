@@ -22,4 +22,4 @@ python s4_p1_gen_bf_labels.py --dataset_path ./demo-bin-picking
 
 
 #训练 HccePose
-python -m torch.distributed.launch --nproc_per_node=2 s4_p2_train_bf_pbr_ddp.py --dataset_path ./demo-bin-picking --start_obj_id 1 --end_obj_id 1 --total_iteration 10
+python -m torch.distributed.launch --nproc_per_node=2 s4_p2_train_bf_pbr_ddp.py --dataset_path ./demo-bin-picking --start_obj_id 1 --end_obj_id 1 --total_iteration 501

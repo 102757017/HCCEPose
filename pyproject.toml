@@ -35,11 +35,14 @@ dependencies =[
     "transformations==2024.6.1",
     "triangle>=20250106",
     "trimesh==4.2.2",
-    "ultralytics==8.3.162",
+    "ultralytics==8.4.16",
     "vispy>=0.16.1",
     "wheel",
     "pyvirtualdisplay",
 	"comm==0.2.3",
+	"pip",
+	"onnxruntime-openvino==1.23.0",
+	"onnx",
 ]
 
 # 这里定义安装模式

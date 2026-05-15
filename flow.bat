@@ -16,7 +16,7 @@ set EGL_DEVICE_ID=%GPU_ID%
 
 REM 进入数据集目录并执行数据生成脚本，过滤包含 "Rendering frame" 的行
 pushd %DATASET_PATH%
-python %SCRIPT_PATH% --gpu_id %GPU_ID% --cc0textures %CC0TEXTURES% --scene_num %SCENE_NUM% | findstr /v "Rendering frame"
+python %SCRIPT_PATH% --gpu_id %GPU_ID% --cc0textures %CC0TEXTURES% --scene_num %SCENE_NUM% 
 popd
 
 REM 生成 YOLO 数据集
@@ -29,6 +29,6 @@ REM 物体正背面标签制备，windows下需要关闭虚拟显示器
 python s4_p1_gen_bf_labels.py --dataset_path %DATASET_PATH%   --no_display
 
 REM 训练 HccePose（分布式）
-python -m torch.distributed.launch --nproc_per_node=1 s4_p2_train_bf_pbr_ddp.py --dataset_path %DATASET_PATH% --start_obj_id 1 --end_obj_id 1 --total_iteration 10
+python -m torch.distributed.launch --nproc_per_node=1 s4_p2_train_bf_pbr_ddp.py --dataset_path %DATASET_PATH% --start_obj_id 1 --end_obj_id 1 --total_iteration 501
 
 pause

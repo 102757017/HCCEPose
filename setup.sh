@@ -7,6 +7,7 @@ unzip -o blenderproc.zip
 
 
 pip install uv
+#uv sync --group train --extra cpu
 mv -f pyproject_kaggle.toml pyproject.toml
 uv pip install -r pyproject.toml --no-progress --system
 

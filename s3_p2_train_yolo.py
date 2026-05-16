@@ -48,8 +48,6 @@ def parse_args():
     parser.add_argument('--model_name', type=str, default=None,
                         help='最终模型文件名（默认：yolo11-{task_suffix}-obj_s.pt）')
     
-    parser.add_argument('--check_interval', type=int, default=60,
-                        help='检测模型文件是否生成的时间间隔（秒），默认60秒')
     
     return parser.parse_args()
 
@@ -81,29 +79,22 @@ if __name__ == '__main__':
     # 训练脚本路径
     train_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'yolo_train', 'train.py')
 
-    # 循环检测最终模型是否生成
-    print(f"目标模型文件: {final_model_path}")
-    while True:
-        if os.path.exists(final_model_path):
-            print(f"模型已存在: {final_model_path}，训练完成。")
-            break
-        else:
-            print("模型文件未找到，启动或恢复训练...")
-            cmd = (
-                f"python {train_script} "
-                f"--data_path {data_objs_path} "
-                f"--epochs {epochs} "
-                f"--imgsz 640 "
-                f"--batch {batch_size} "
-                f"--gpu_num {gpu_num} "
-                f"--task {task_suffix}"
-            )
-            print(f"执行命令: {cmd}")
-            ret = os.system(cmd)
-            if ret != 0:
-                print("训练命令执行失败，程序退出。")
-                sys.exit(1)
-            # 训练可能因中断而提前退出，但最终模型尚未生成
-            # 等待一段时间后再次检查，若仍未生成则继续调用 train.py（自动恢复）
-            print(f"训练已结束或中断，等待 {args.check_interval} 秒后重新检查模型文件...")
-            time.sleep(args.check_interval)
+    # 直接执行训练命令（train.py 内部已支持自动恢复）
+    cmd = (
+        f"python {train_script} "
+        f"--data_path {data_objs_path} "
+        f"--epochs {epochs} "
+        f"--imgsz 640 "
+        f"--batch {batch_size} "
+        f"--gpu_num {gpu_num} "
+        f"--task {task_suffix}"
+    )
+    
+    print(f"执行命令: {cmd}")
+    ret = os.system(cmd)
+    
+    if ret != 0:
+        print("训练命令执行失败，程序退出。")
+        sys.exit(1)
+    else:
+        print("训练完成！")

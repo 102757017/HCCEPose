@@ -109,7 +109,7 @@ def parse_args():
     
     parser.add_argument('--batch_size', type=int, default=24, help='每个 GPU 的 batch size，总 batch = batch_size * GPU数量')
     
-    parser.add_argument('--num_workers', type=int, default=12, help='DataLoader 的工作进程数')
+    parser.add_argument('--num_workers', type=int, default=4, help='DataLoader 的工作进程数')
     
     parser.add_argument('--log_freq', type=int, default=500, help='保存检查点和测试的间隔迭代次数')
     

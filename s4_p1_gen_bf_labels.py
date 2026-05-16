@@ -33,7 +33,7 @@ def parse_args():
 
     parser.add_argument('--batch_size', type=int, default=16,help='DataLoader 的批大小。')
     
-    parser.add_argument('--num_workers', type=int, default=16,help='DataLoader 的工作进程数量。')
+    parser.add_argument('--num_workers', type=int, default=4,help='DataLoader 的工作进程数量。')
     
     parser.add_argument('--obj_ids', type=int, nargs='+', default=None,help='可选：指定要处理的物体 ID 列表。若不指定，则处理所有物体。')
     

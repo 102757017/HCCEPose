@@ -45,12 +45,13 @@ if __name__ == '__main__':
                         {
                             "cx": 325.2611083984375,
                             "cy": 242.04899588216654,
-                            "depth_scale": 0.1,
+                            "depth_scale": 0.1, #在以 uint16 格式存储时：depth_scale = 1 → 分辨率为 1 mm；depth_scale = 0.1 → 分辨率为 0.1 mm
                             "fx": 572.411363389757,
                             "fy": 573.5704328585578,
                             "height": 480,
                             "width": 640
                         })
+        
 
     models_ids = [int(key) for key in models_info.keys()]
     models_ids = np.array(models_ids)

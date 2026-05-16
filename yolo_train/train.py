@@ -106,7 +106,7 @@ def train_yolo11(task, data_path, gpu_num, epochs, imgsz, batch):
         dropout=0.2,                        # Dropout比例
         auto_augment='AugMix',              # 自动增强策略
         freeze=0,                           # 冻结前N层
-        multi_scale=True,                   # 是否启用多尺度训练
+        multi_scale=0.5,                    # 启用网络输入张量的多尺度分辨率训练
     )
 
     # 训练完成后，将最终模型保存到固定的任务目录（例如 detection/obj_s/）

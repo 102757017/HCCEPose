@@ -48,17 +48,17 @@ dependencies =[
 # 这里定义安装模式
 [project.optional-dependencies]
 cpu =[
-    "torch==2.8.0",
-    "torchvision==0.23.0",
-    "torchaudio==2.8.0",
+    "torch>=2.1.2",
+    "torchaudio>=2.1.2",
+    "torchvision>=0.16.2",
     "kornia==0.6.9",
     "diffrp-nvdiffrast>=0.3.3.1",
     "fvcore==0.1.5.post20221221",
 ]
 cuda =[
-    "torch==2.8.0",
-    "torchvision==0.23.0",
-    "torchaudio==2.8.0",
+    "torch>=2.1.2",
+    "torchaudio>=2.1.2",
+    "torchvision>=0.16.2",
     "kornia==0.6.9",
     "diffrp-nvdiffrast>=0.3.3.1",
     "fvcore==0.1.5.post20221221",

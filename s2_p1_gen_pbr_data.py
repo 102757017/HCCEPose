@@ -17,13 +17,28 @@ import blenderproc as bproc
 import numpy as np
 from tqdm import tqdm
 from kasal.utils.io_json import load_json2dict, write_dict2json
+import time
+import logging
+
+# 配置日志：可通过设置环境变量或修改 level 来关闭 debug 输出
+# 关闭方式1：设置环境变量 export BPROC_LOG_LEVEL=INFO
+# 关闭方式2：修改下方 level = logging.INFO
+logging.basicConfig(
+    level=logging.DEBUG,  # 改为 INFO 即可关闭 debug 耗时输出
+    format='[%(levelname)s] %(message)s'
+)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='生成 PBR 数据 (BlenderProc)')
     parser.add_argument('--gpu_id', type=int, required=True, help='GPU 编号，例如 0')
     parser.add_argument('--cc0textures', type=str, required=True, help='cc0textures 材质库路径')
     parser.add_argument('--scene_num', type=int, default=50, help='生成的场景数量，每个场景渲染 20 帧，总帧数 = scene_num * 20')
+    parser.add_argument('--verbose', action='store_true', help='开启详细耗时日志（debug级别）')
     args = parser.parse_args()
+
+    # 如果未指定 --verbose，则关闭 debug 输出
+    if not args.verbose:
+        logging.getLogger().setLevel(logging.INFO)
 
     gpu_id = args.gpu_id
     cc_textures_path = args.cc0textures
@@ -68,6 +83,7 @@ if __name__ == '__main__':
 
     # 初始化 BlenderProc
     bproc.init()
+    
     bproc.loader.load_bop_intrinsics(bop_dataset_path=bop_dataset_path)
 
     # 创建房间平面和光源
@@ -102,10 +118,13 @@ if __name__ == '__main__':
         obj.set_rotation_euler(bproc.sampler.uniformSO3())
 
     bproc.renderer.enable_depth_output(activate_antialiasing=False,output_dir=cachedir)
-    bproc.renderer.set_max_amount_of_samples(50)
-    bproc.renderer.set_render_devices(desired_gpu_device_type='CUDA', desired_gpu_ids=[gpu_id])
+    bproc.renderer.set_max_amount_of_samples(20)
+    #bproc.renderer.set_render_devices(desired_gpu_device_type='CUDA', desired_gpu_ids=[gpu_id])
+    #相比CUDA，OptiX 在同等 RTX 显卡上通常有 15%-30% 的性能提升
+    bproc.renderer.set_render_devices(desired_gpu_device_type='OPTIX', desired_gpu_ids = [gpu_id]) 
 
     for i in tqdm(range(num_scenes)):
+        t_start = time.time()
         rand_s = np.random.rand()
 
         # 物体选择逻辑：50% 概率重复选取 30 个物体（允许重复），否则不重复选取最多 30 个
@@ -115,14 +134,18 @@ if __name__ == '__main__':
             idx_l = np.random.choice(models_ids, size=min(len(models_ids), 30), replace=False)
         obj_ids = [int(idx) for idx in idx_l]
 
-        # 加载物体
+        # 步骤 1：加载 BOP 模型
+        t0 = time.time()
         target_bop_objs = bproc.loader.load_bop_objs(
             bop_dataset_path=bop_dataset_path,
             mm2m=True,
             obj_ids=obj_ids,
         )
+        t1 = time.time()
+        logging.debug(f"1. 加载 3D 模型耗时: {t1 - t0:.2f} 秒")
 
-        # 设置材质和物理属性
+
+        # 步骤 2：设置材质与初始位姿
         for obj in target_bop_objs:
             obj.set_shading_mode('auto')
             obj.hide(True)
@@ -131,7 +154,8 @@ if __name__ == '__main__':
             mat = obj.get_materials()[0]
             mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
             mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
-            obj.enable_rigidbody(True, mass=1.0, friction=100.0, linear_damping=0.99, angular_damping=0.99)
+            # 性能优化：增加 collision_shape='CONVEX_HULL'
+            obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99, collision_shape='CONVEX_HULL')
             obj.hide(False)
 
         # 随机光源
@@ -155,24 +179,36 @@ if __name__ == '__main__':
             sample_pose_func=sample_pose_func,
             max_tries=1000
         )
+        
+        t2 = time.time()
+        logging.debug(f"2. 材质和位姿初始化耗时: {t2 - t1:.2f} 秒")
+
+        # 步骤 3：刚体物理仿真
         bproc.object.simulate_physics_and_fix_final_poses(
-            min_simulation_time=3,
-            max_simulation_time=10,
-            check_object_interval=1,
-            substeps_per_frame=20,
-            solver_iters=25
+            min_simulation_time=2,   # 性能优化，等待时间3→2
+            max_simulation_time=10,   
+            check_object_interval=1, #检查物体运动状态是否趋于稳定的频率
+            substeps_per_frame=10,   # 性能优化，20→10 (计算量减半)
+            solver_iters=10          # 性能优化，25→10 (计算量减半)
         )
+        t3 = time.time()
+        logging.debug(f"3. 物理仿真计算(CPU密集)耗时: {t3 - t2:.2f} 秒")
 
+        
+        # 步骤 4：建立 BVH 树
         bop_bvh_tree = bproc.object.create_bvh_tree_multi_objects(sampled_target_bop_objs)
+        t4 = time.time()
+        logging.debug(f"4. BVH树构建(CPU密集)耗时: {t4 - t3:.2f} 秒")
 
-        # 生成 20 个相机位姿并渲染
+
+        # 步骤 5：采样相机位姿 (20帧)
         cam_poses = 0
         while cam_poses < 20:
             location = bproc.sampler.shell(
                 center=[0, 0, 0],
-                radius_min=0.3,
-                radius_max=1.2,
-                elevation_min=5,
+                radius_min=0.3,  # 最小物距 0.3 米
+                radius_max=1.2,  # 最大物距 1.2 米
+                elevation_min=5, # 相机俯仰角 0°相机完全水平
                 elevation_max=89
             )
             poi = bproc.object.compute_poi(
@@ -183,11 +219,21 @@ if __name__ == '__main__':
                 inplane_rot=np.random.uniform(-3.14159, 3.14159)
             )
             cam2world_matrix = bproc.math.build_transformation_mat(location, rotation_matrix)
+            
+            # 距离物体≥0.3米，相机没有被其他物体严重遮挡
             if bproc.camera.perform_obstacle_in_view_check(cam2world_matrix, {"min": 0.3}, bop_bvh_tree):
                 bproc.camera.add_camera_pose(cam2world_matrix, frame=cam_poses)
                 cam_poses += 1
+        t5 = time.time()
+        logging.debug(f"5. 20帧相机位姿与遮挡计算耗时: {t5 - t4:.2f} 秒")
 
+
+        # 步骤 6：渲染
         data = bproc.renderer.render(output_dir=cachedir)  #设置缓存路径，否则在windows上会将图片都缓存到C盘根目录下
+        t6 = time.time()
+        logging.debug(f"6. Cycles与Compositor渲染(GPU密集)耗时: {t6 - t5:.2f} 秒")
+
+        # 步骤 7：保存数据 (磁盘I/O)
         bproc.writer.write_bop(
             bop_parent_path,
             target_objects=sampled_target_bop_objs,
@@ -198,7 +244,13 @@ if __name__ == '__main__':
             color_file_format="JPEG",
             ignore_dist_thres=10
         )
+        t7 = time.time()
+        logging.debug(f"7. 保存图像与掩码到磁盘(I/O)耗时: {t7 - t6:.2f} 秒")
 
+        
         for obj in sampled_target_bop_objs:
             obj.disable_rigidbody()
             obj.hide(True)
+            
+        t8 = time.time()
+        logging.debug(f"单个场景总耗时: {t8 - t_start:.2f} 秒")

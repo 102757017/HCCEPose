@@ -156,17 +156,17 @@ if __name__ == '__main__':
     end_obj_id =1
     
     # 总训练轮数。
-    total_iteration = 50001
+    total_iteration = 2001
     
     # 学习率。
-    lr = 0.0002
+    lr = 0.001
 
     
     # 每轮训练的样本数量。
     batch_size = 24
     
     # DataLoader 的进程数量。
-    num_workers = 12
+    num_workers = 4
     
 
     # 保存检查点的间隔轮数。

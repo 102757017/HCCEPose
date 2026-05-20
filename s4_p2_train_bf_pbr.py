@@ -1,4 +1,3 @@
-%%writefile s4_p2_train_bf_pbr.py
 # Author: Yulin Wang (yulinwang@seu.edu.cn)
 # School of Mechanical Engineering, Southeast University, China
 

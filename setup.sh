@@ -25,3 +25,6 @@ curl -L -o cc0textures-512.zip \
 
 # 2. 解压到当前目录（会自动创建 cc0textures-512 文件夹）
 unzip -q cc0textures-512.zip -d . 
+
+# 下载预训练权重
+wget -P ./pre-trained https://hf-mirror.com/datasets/SEU-WYL/HccePose/resolve/main/demo-tex-objs/HccePose/obj_01/best_score/0_8283step50000

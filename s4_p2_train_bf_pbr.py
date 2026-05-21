@@ -175,8 +175,8 @@ if __name__ == '__main__':
     # ================= 迁移学习配置 =================
     # 如果要从头训练（或继续训练当前物体），保持 None 即可。
     # 如果要使用上一个物体的最佳权重加速训练，请填入具体文件路径。
-    transfer_weight_path = './demo-bin-picking/HccePose/0_8283step50000' 
-    freeze_warmup_steps = 100  # 前多少步冻结主干网络进行预热
+    transfer_weight_path = './pre-trained/0_8283step50000' 
+    freeze_warmup_steps = 250  # 前多少步冻结主干网络进行预热
     # ===================================================
 
     parser = argparse.ArgumentParser()

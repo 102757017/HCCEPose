@@ -136,7 +136,7 @@ if __name__ == '__main__':
     transfer_weight_path = './pre-trained/0_8283step50000' 
     # ===================================================
     # 全局线性预热步数
-    warmup_steps = 100
+    warmup_steps = 50
 
     parser = argparse.ArgumentParser()
     if ide_debug:
@@ -218,7 +218,7 @@ if __name__ == '__main__':
         best_score = checkpoint_info.get('best_score', 0)
         has_local_ckpt = (iteration_step > 0)
 
-        # 3. 构建优化器（全局统一学习率，不再分组）
+        # 3. 构建优化器（全局统一学习率）
         optimizer = optim.Adam(net.parameters(), lr=lr)
 
         # 4. 线性预热调度器
@@ -229,18 +229,11 @@ if __name__ == '__main__':
             load_checkpoint(save_path, net, optimizer=optimizer, local_rank=local_rank, CUDA_DEVICE=CUDA_DEVICE)
             if local_rank == 0:
                 print(f"==> Resumed from local checkpoint at step {iteration_step}")
-            # 尝试恢复 scheduler 状态
-            sched_path = os.path.join(save_path, 'scheduler.pt')
-            if os.path.exists(sched_path):
-                scheduler.load_state_dict(torch.load(sched_path, map_location='cpu'))
-                if local_rank == 0:
-                    print("==> Scheduler state restored.")
-            else:
-                # 若没有保存，手动追赶步数
-                for _ in range(iteration_step):
-                    scheduler.step()
-                if local_rank == 0:
-                    print("==> Scheduler state not found, caught up manually.")
+            # 手动追赶 scheduler 步数，不依赖保存文件
+            for _ in range(iteration_step):
+                scheduler.step()
+            if local_rank == 0:
+                print("==> Scheduler caught up to current step.")
         elif is_transfer_mode and transfer_weight_path is not None and os.path.exists(transfer_weight_path):
             if local_rank == 0:
                 print(f"==> Transfer learning: Loading weights from {transfer_weight_path}")
@@ -282,12 +275,8 @@ if __name__ == '__main__':
                         if max_acc >= best_score:
                             best_score = max_acc
                             save_best_checkpoint(best_save_path, net, optimizer, best_score, iteration_step, keypoints_=add_list_l)
-                            # 同时保存 scheduler 状态到 best 目录
-                            torch.save(scheduler.state_dict(), os.path.join(best_save_path, 'scheduler.pt'))
                         loss_net.print_error_ratio()
                         save_checkpoint(save_path, net, iteration_step, best_score, optimizer, 3, keypoints_=add_list_l)
-                        # 保存 scheduler 状态
-                        torch.save(scheduler.state_dict(), os.path.join(save_path, 'scheduler.pt'))
                 
                 # 数据搬移 GPU
                 if torch.cuda.is_available():
@@ -327,7 +316,7 @@ if __name__ == '__main__':
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()
-                scheduler.step()   # 每次参数更新后推进预热调度器
+                scheduler.step()   # 推进线性预热
                 torch.cuda.empty_cache()
                 
                 if args.local_rank == 0:

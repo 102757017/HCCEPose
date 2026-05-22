@@ -334,7 +334,11 @@ if __name__ == '__main__':
                             best_score = max_acc
                             save_best_checkpoint(best_save_path, net, optimizer, best_score, iteration_step, keypoints_=add_list_l)
                         loss_net.print_error_ratio()
+<<<<<<< HEAD
                         save_checkpoint(save_path, net, iteration_step, best_score, optimizer, 3, keypoints_=add_list_l)
+=======
+                        #save_checkpoint(save_path, net, iteration_step, best_score, optimizer, 3, keypoints_=add_list_l)
+>>>>>>> 3e0d7aaf6e0b9784ad686a06fa737d324ac5cf4d
                 
                 # 数据搬移 GPU
                 if torch.cuda.is_available():

@@ -1,42 +1,3 @@
-'''
-
-Train HccePose (BF).  
-After training is completed, an `HccePose` folder will be created in the dataset directory  
-to store the weight files for each object.  
-
-Example:
-```
-demo-tex-objs
-|--- HccePose
-    |--- obj_01
-    ...
-    |--- obj_10
-|--- models
-|--- train_pbr
-|--- train_pbr_xyz_GT_back
-|--- train_pbr_xyz_GT_front
-```
-
-------------------------------------------------------    
-
-训练 HccePose (BF)。  
-训练完成后，会在数据集文件夹下生成一个 `HccePose` 文件夹，  
-用于保存每个物体的权重文件。  
-
-示例：
-```
-demo-tex-objs
-|--- HccePose
-    |--- obj_01
-    ...
-    |--- obj_10
-|--- models
-|--- train_pbr
-|--- train_pbr_xyz_GT_back
-|--- train_pbr_xyz_GT_front
-'''
-
-
 import os, torch, argparse
 import itertools
 import numpy as np
@@ -46,6 +7,7 @@ from HccePose.network_model import HccePose_BF_Net, HccePose_Loss, load_checkpoi
 from torch.cuda.amp import autocast as autocast
 from torch.cuda.amp import GradScaler
 from torch import optim
+from torch.optim.lr_scheduler import LinearLR
 import torch.distributed as dist
 from HccePose.visualization import vis_rgb_mask_Coord
 from HccePose.PnP_solver import solve_PnP, solve_PnP_comb
@@ -56,7 +18,7 @@ def test(obj_ply, obj_info, net: HccePose_BF_Net, test_loader: torch.utils.data.
     net.eval()
     add_list_l = []
     
-    with torch.no_grad():  # 关键：禁用梯度计算，大幅降低显存占用
+    with torch.no_grad():
         for batch_idx, (rgb_c, mask_vis_c, GT_Front_hcce, GT_Back_hcce, Bbox, cam_K, cam_R_m2c, cam_t_m2c) in tqdm(enumerate(test_loader)):
             if torch.cuda.is_available():
                 rgb_c = rgb_c.to('cuda:'+CUDA_DEVICE, non_blocking=True)
@@ -78,15 +40,12 @@ def test(obj_ply, obj_info, net: HccePose_BF_Net, test_loader: torch.utils.data.
                 pred_back_code_raw = pred_results['pred_back_code_raw'].reshape((-1,128,128,3,8)).permute((0,1,2,4,3)).reshape((-1,128,128,24))
                 pred_front_code = torch.cat([pred_front_code, pred_front_code_raw], dim=-1)
                 pred_back_code = torch.cat([pred_back_code, pred_back_code_raw], dim=-1)
-                '''
-                vis_rgb_mask_Coord(rgb_c, pred_mask, pred_front_code, pred_back_code, img_path='show_vis.jpg')
-                '''
+                
                 pred_mask_np = pred_mask.detach().cpu().numpy()
                 pred_front_code_0_np = pred_front_code_0.detach().cpu().numpy()
                 pred_back_code_0_np = pred_back_code_0.detach().cpu().numpy()
                 coord_image_np = coord_image.detach().cpu().numpy()
                 
-                # 释放不需要的中间变量
                 del pred_results, pred_front_code_raw, pred_back_code_raw, pred_front_code, pred_back_code
                 
                 pred_m_bf_c_np = [(pred_mask_np[i], pred_front_code_0_np[i], pred_back_code_0_np[i], coord_image_np[i], cam_K[i]) for i in range(pred_mask_np.shape[0])]
@@ -111,7 +70,6 @@ def test(obj_ply, obj_info, net: HccePose_BF_Net, test_loader: torch.utils.data.
                     add_list = np.array(add_list)
                     add_list_l.append(add_list)
             
-            # 每个 batch 结束后清理显存
             torch.cuda.empty_cache()
     
     add_list_l = np.array(add_list_l)
@@ -161,7 +119,7 @@ if __name__ == '__main__':
     test_batch_size = 24      # 测试 batch size（减小显存占用）
     
     # DataLoader 的进程数量。
-    num_workers = 4
+    num_workers = 8
     
     # 保存检查点的间隔轮数。
     log_freq = 500
@@ -175,9 +133,10 @@ if __name__ == '__main__':
     # ================= 迁移学习配置 =================
     # 如果要从头训练（或继续训练当前物体），保持 None 即可。
     # 如果要使用上一个物体的最佳权重加速训练，请填入具体文件路径。
-    transfer_weight_path = './pre-trained/0_8283step50000' 
-    freeze_warmup_steps = 250  # 前多少步冻结主干网络进行预热
+    transfer_weight_path = './demo-bin-picking/HccePose/0_8283step50000' 
     # ===================================================
+    # 全局线性预热步数
+    warmup_steps = 100
 
     parser = argparse.ArgumentParser()
     if ide_debug:
@@ -237,7 +196,6 @@ if __name__ == '__main__':
             size_xyz=size_xyz,
         )
 
-        # ========== 生命周期严格管理（安全 DDP 版本） ==========
         # 1. 移至 GPU 并转换 SyncBN（但尚未 DDP 包装）
         if torch.cuda.is_available():
             net = net.to('cuda:'+CUDA_DEVICE)
@@ -250,7 +208,7 @@ if __name__ == '__main__':
         iteration_step = 0
         is_transfer_mode = (transfer_weight_path is not None)
         
-        # 2. 探测本地断点（仅用于获取 iteration_step 以构建正确的优化器）
+        # 2. 探测本地断点（仅用于获取 iteration_step）
         checkpoint_info = {'iteration_step': 0, 'best_score': 0}
         try:
             checkpoint_info = load_checkpoint(save_path, net, optimizer=None, local_rank=local_rank, CUDA_DEVICE=CUDA_DEVICE)
@@ -260,34 +218,29 @@ if __name__ == '__main__':
         best_score = checkpoint_info.get('best_score', 0)
         has_local_ckpt = (iteration_step > 0)
 
-        # 3. 构建优化器（采用软冻结：学习率 0.0 而非 requires_grad=False）
-        if is_transfer_mode:
-            backbone_params, aspp_params, head_params = [], [], []
-            for name, param in net.named_parameters():
-                if 'aspp.conv_1x1_4' in name:
-                    head_params.append(param)
-                elif 'resnet' in name or 'efficientnet' in name:
-                    backbone_params.append(param)
-                else:
-                    aspp_params.append(param)
-            
-            # 预热期内 backbone 学习率设为 0.0，DDP 依旧能同步梯度，但更新步长为 0
-            bb_lr = 0.0 if iteration_step < freeze_warmup_steps else (lr * 0.1)
-            optimizer = optim.Adam([
-                {'params': backbone_params, 'lr': bb_lr},
-                {'params': aspp_params, 'lr': lr * 0.5},
-                {'params': head_params, 'lr': lr}
-            ])
-        else:
-            optimizer = optim.Adam(net.parameters(), lr=lr)
+        # 3. 构建优化器（全局统一学习率，不再分组）
+        optimizer = optim.Adam(net.parameters(), lr=lr)
 
-        # 4. 加载权重（优先本地断点，否则迁移学习）
+        # 4. 线性预热调度器
+        scheduler = LinearLR(optimizer, start_factor=0.01, total_iters=warmup_steps)
+
+        # 5. 加载权重（优先本地断点，否则迁移学习）
         if has_local_ckpt:
             load_checkpoint(save_path, net, optimizer=optimizer, local_rank=local_rank, CUDA_DEVICE=CUDA_DEVICE)
             if local_rank == 0:
                 print(f"==> Resumed from local checkpoint at step {iteration_step}")
-                if is_transfer_mode and iteration_step < freeze_warmup_steps:
-                    print(f"==> Backbone is in WARMUP phase (Soft-frozen, LR=0.0).")
+            # 尝试恢复 scheduler 状态
+            sched_path = os.path.join(save_path, 'scheduler.pt')
+            if os.path.exists(sched_path):
+                scheduler.load_state_dict(torch.load(sched_path, map_location='cpu'))
+                if local_rank == 0:
+                    print("==> Scheduler state restored.")
+            else:
+                # 若没有保存，手动追赶步数
+                for _ in range(iteration_step):
+                    scheduler.step()
+                if local_rank == 0:
+                    print("==> Scheduler state not found, caught up manually.")
         elif is_transfer_mode and transfer_weight_path is not None and os.path.exists(transfer_weight_path):
             if local_rank == 0:
                 print(f"==> Transfer learning: Loading weights from {transfer_weight_path}")
@@ -297,8 +250,10 @@ if __name__ == '__main__':
             # 剔除坐标预测层，使其随机初始化
             state_dict = {k: v for k, v in state_dict.items() if 'aspp.conv_1x1_4' not in k}
             net.load_state_dict(state_dict, strict=False)
+            if local_rank == 0:
+                print(f"==> Transfer weights loaded, starting with Linear Warmup ({warmup_steps} steps).")
 
-        # 5. DDP 封装（必须在所有 load_state_dict 之后！）
+        # 6. DDP 封装（必须在所有 load_state_dict 之后！）
         if not ide_debug:
             net = torch.nn.parallel.DistributedDataParallel(net, device_ids=[args.local_rank])
         # ===================================================
@@ -315,12 +270,6 @@ if __name__ == '__main__':
         while True:
             end_training = False
             for batch_idx, (rgb_c, mask_vis_c, GT_Front_hcce, GT_Back_hcce) in enumerate(train_loader):
-                # 软解冻：到达预热步数时恢复 backbone 的学习率
-                if is_transfer_mode and iteration_step == freeze_warmup_steps:
-                    optimizer.param_groups[0]['lr'] = lr * 0.1
-                    if args.local_rank == 0:
-                        print(f"==> Step {iteration_step}: Backbone soft-unfrozen, full finetuning started (LR={lr*0.1}).")
-                
                 # 测试与保存（仅 local_rank=0）
                 if args.local_rank == 0:
                     if (iteration_step) % log_freq == 0 and iteration_step > 0:
@@ -333,12 +282,12 @@ if __name__ == '__main__':
                         if max_acc >= best_score:
                             best_score = max_acc
                             save_best_checkpoint(best_save_path, net, optimizer, best_score, iteration_step, keypoints_=add_list_l)
+                            # 同时保存 scheduler 状态到 best 目录
+                            torch.save(scheduler.state_dict(), os.path.join(best_save_path, 'scheduler.pt'))
                         loss_net.print_error_ratio()
-<<<<<<< HEAD
                         save_checkpoint(save_path, net, iteration_step, best_score, optimizer, 3, keypoints_=add_list_l)
-=======
-                        #save_checkpoint(save_path, net, iteration_step, best_score, optimizer, 3, keypoints_=add_list_l)
->>>>>>> 3e0d7aaf6e0b9784ad686a06fa737d324ac5cf4d
+                        # 保存 scheduler 状态
+                        torch.save(scheduler.state_dict(), os.path.join(save_path, 'scheduler.pt'))
                 
                 # 数据搬移 GPU
                 if torch.cuda.is_available():
@@ -359,7 +308,7 @@ if __name__ == '__main__':
                     ]
                     loss = l_l[0] + l_l[1] + l_l[2]
                 
-                # 分布式 NaN 处理（兼容 DDP 获取模型本体）
+                # 分布式 NaN 处理
                 if not ide_debug:
                     torch.distributed.barrier()
                     nan_flag = torch.tensor([int(torch.isnan(loss).any())], device=loss.device)
@@ -378,6 +327,7 @@ if __name__ == '__main__':
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()
+                scheduler.step()   # 每次参数更新后推进预热调度器
                 torch.cuda.empty_cache()
                 
                 if args.local_rank == 0:
@@ -387,6 +337,7 @@ if __name__ == '__main__':
                           "loss_back:", torch.sum(current_loss['Back_L1Losses']).item(),  
                           "loss_mask:", current_loss['mask_loss'].item(),  
                           "total_loss:", loss.item(),
+                          "lr:", optimizer.param_groups[0]['lr'],
                           flush=True)
                 
                 iteration_step += 1

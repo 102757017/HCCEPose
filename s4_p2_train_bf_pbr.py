@@ -1,4 +1,3 @@
-%%writefile /kaggle/working/HCCEPose/s4_p2_train_bf_pbr.py
 import os, torch, argparse
 import itertools
 import numpy as np

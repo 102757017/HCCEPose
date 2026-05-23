@@ -32,7 +32,7 @@ dependencies =[
     "pytz>=2026.2",
     "rich==14.2.0",
     "scipy==1.15.3",
-    "setuptools",    
+    "setuptools<70.0.0",    
     "tensorboard>=2.20.0",
     "torch>=2.1.2",
     "torchaudio>=2.1.2",

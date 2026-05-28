@@ -19,6 +19,7 @@ from tqdm import tqdm
 from kasal.utils.io_json import load_json2dict, write_dict2json
 import time
 import logging
+import colorsys
 
 # 配置日志：可通过设置环境变量或修改 level 来关闭 debug 输出
 # 关闭方式1：设置环境变量 export BPROC_LOG_LEVEL=INFO
@@ -27,6 +28,39 @@ logging.basicConfig(
     level=logging.DEBUG,  # 改为 INFO 即可关闭 debug 耗时输出
     format='[%(levelname)s] %(message)s'
 )
+
+def perturb_vertex_colors_hsv(vcol_data, hue_shift=0.0, sat_shift_range=0.1, val_shift_range=0.2):
+    """
+    批量修改顶点颜色：在 HSV 空间扰动（默认保持色相不变），只改变深浅和饱和度。
+    
+    参数:
+        vcol_data: bpy.types.MeshLoopColorLayer.data (顶点颜色集合)
+        hue_shift: 色相随机偏移范围（±值），默认 0.0 表示完全不变
+        sat_shift_range: 饱和度随机偏移范围（±值），默认 0.1
+        val_shift_range: 明度随机偏移范围（±值），默认 0.2，控制深浅
+    """
+    if len(vcol_data) == 0:
+        return
+    
+    # 取第一个顶点的颜色（假设所有顶点颜色相同，效率最高）
+    orig_r, orig_g, orig_b, orig_a = vcol_data[0].color
+    
+    # RGB → HSV
+    h, s, v = colorsys.rgb_to_hsv(orig_r, orig_g, orig_b)
+    
+    # 随机扰动
+    new_h = (h + np.random.uniform(-hue_shift, hue_shift)) % 1.0
+    new_s = np.clip(s + np.random.uniform(-sat_shift_range, sat_shift_range), 0.0, 1.0)
+    new_v = np.clip(v + np.random.uniform(-val_shift_range, val_shift_range), 0.0, 1.0)
+    
+    # HSV → RGB
+    new_r, new_g, new_b = colorsys.hsv_to_rgb(new_h, new_s, new_v)
+    new_color = np.array([new_r, new_g, new_b, orig_a], dtype=np.float32)
+    
+    # 批量赋值（所有顶点颜色统一为新值）
+    flat_colors = np.tile(new_color, (len(vcol_data), 1)).flatten()
+    vcol_data.foreach_set("color", flat_colors)
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='生成 PBR 数据 (BlenderProc)')
@@ -154,6 +188,19 @@ if __name__ == '__main__':
             mat = obj.get_materials()[0]
             mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
             mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
+
+            #增加颜色扰动
+            mesh = obj.get_mesh()
+            if mesh.vertex_colors:
+                vcol_data = mesh.vertex_colors.active.data
+                perturb_vertex_colors_hsv(
+                    vcol_data,
+                    hue_shift=0.0,           # 完全保留原始色相
+                    sat_shift_range=0.1,     # 饱和度微调（避免过于鲜艳或褪色）
+                    val_shift_range=0.2      # 明度变化 ±0.2，控制深浅
+                    )
+            
+            
             # 性能优化：增加 collision_shape='CONVEX_HULL'
             obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99, collision_shape='CONVEX_HULL')
             obj.hide(False)
@@ -206,8 +253,8 @@ if __name__ == '__main__':
         while cam_poses < 20:
             location = bproc.sampler.shell(
                 center=[0, 0, 0],
-                radius_min=0.3,  # 最小物距 0.3 米
-                radius_max=1.2,  # 最大物距 1.2 米
+                radius_min=0.2,  # 最小物距 0.2 米
+                radius_max=0.7,  # 最大物距 0.7 米
                 elevation_min=5, # 相机俯仰角 0°相机完全水平
                 elevation_max=89
             )

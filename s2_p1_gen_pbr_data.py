@@ -196,8 +196,8 @@ if __name__ == '__main__':
                 perturb_vertex_colors_hsv(
                     vcol_data,
                     hue_shift=0.0,           # 完全保留原始色相
-                    sat_shift_range=0.1,     # 饱和度微调（避免过于鲜艳或褪色）
-                    val_shift_range=0.2      # 明度变化 ±0.2，控制深浅
+                    sat_shift_range=0,       # 中性色（黑、白、灰）RGB 三个分量相等，饱和度 S = 0，调整饱和度会导致偏色
+                    val_shift_range=0.25      # 明度变化 ±0.25，控制深浅
                     )
             
             

@@ -14,7 +14,7 @@ if __name__ == '__main__':
     |--- models
         |--- obj_000001.ply
     '''
-    dataset_path = 'demo-link-picking'
+    dataset_path = 'gearbox-picking'
 
     # Retrieve all PLY files from the folder and its subfolders.
     # 获取该文件夹及其所有子文件夹中的所有PLY文件。

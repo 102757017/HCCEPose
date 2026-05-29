@@ -1,0 +1,40 @@
+{
+  "obj_id": 1,
+  "pytorch_time_s": 3.8526413440704346,
+  "onnx_time_s": 3.251713514328003,
+  "mask_logits_mae": 8.645285561215132e-05,
+  "mask_logits_max": 0.0022125244140625,
+  "code_logits_mae": 1.6746402025091811e-06,
+  "code_logits_max": 0.00014495849609375,
+  "mask_binary_match_ratio": 1.0,
+  "pose_count_compared": 5,
+  "pose_diffs": [
+    {
+      "pose_id": 0,
+      "translation_diff_mm": 0.0,
+      "rotation_diff_deg": 0.0
+    },
+    {
+      "pose_id": 1,
+      "translation_diff_mm": 0.0,
+      "rotation_diff_deg": 0.0
+    },
+    {
+      "pose_id": 2,
+      "translation_diff_mm": 0.0,
+      "rotation_diff_deg": 0.0
+    },
+    {
+      "pose_id": 3,
+      "translation_diff_mm": 0.0,
+      "rotation_diff_deg": 0.0
+    },
+    {
+      "pose_id": 4,
+      "translation_diff_mm": 0.0,
+      "rotation_diff_deg": 0.0
+    }
+  ],
+  "translation_diff_mm_mean": 0.0,
+  "rotation_diff_deg_mean": 0.0
+}

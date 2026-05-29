@@ -59,7 +59,7 @@ if __name__ == '__main__':
     # 输入 PLY 文件路径，脚本会根据 obj_id 生成符合 BOP 格式的对应 PLY 文件。
     # 若 PLY 文件包含纹理图，脚本同时会生成符合 BOP 格式的纹理图文件。
 
-    input_ply = './demo-link-picking/models/link.ply'
+    input_ply = './gearbox-picking/models/gearbox.ply'
     obj_id = 1
     output_ply = os.path.join(os.path.dirname(input_ply), 'obj_%s.ply'%str(obj_id).rjust(6, '0'))
 

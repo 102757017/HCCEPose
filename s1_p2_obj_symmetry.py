@@ -10,7 +10,7 @@ if __name__ == '__main__':
 
     # Set the folder path; KASAL will automatically search for all PLY or OBJ files in the folder
     # 设置文件夹路径，KASAL 会自动查找文件夹下所有 PLY 或 OBJ 文件
-    mesh_path = 'demo-link-picking'
+    mesh_path = 'gearbox-picking'
 
     # Launch the graphical user interface (GUI) of KASAL
     # 启动 KASAL 的图形界面
@@ -21,7 +21,9 @@ if __name__ == '__main__':
 '''
 1. C(=1) : Circular Item（圆形物体）
 对称类型：C₁（无旋转对称性，或只有恒等操作）
-物理含义：物体在绕轴旋转 360° 时，没有任何非平凡的旋转对称（除了不转）。但为什么叫 “Circular Item”？这里可能是指物体外形接近圆形，但实际对称性很低，或者特指只有反射对称而无旋转对称的薄圆盘（类似于 C₁ 但带有镜面）。不过更常见的解释是：C₁ 表示无对称性，但此处被标注为 Circular Item，可能来自特定软件对一类“圆柱/圆形零件”的归类。
+物理含义：物体在绕轴旋转 360° 时，没有任何非平凡的旋转对称（除了不转）。
+但为什么叫 “Circular Item”？这里可能是指物体外形接近圆形，但实际对称性很低，或者特指只有反射对称而无旋转对称的薄圆盘（类似于 C₁ 但带有镜面）。
+不过更常见的解释是：C₁ 表示无对称性，但此处被标注为 Circular Item，可能来自特定软件对一类“圆柱/圆形零件”的归类。
 
 2. D(>1) : n-fold Prismatic Item（n 棱柱形物体）
 对称类型：Dₙ（二面体群，n ≥ 2）

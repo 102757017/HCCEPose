@@ -11,6 +11,7 @@ s2_p1_gen_pbr_data.py 用于生成 PBR 数据，原始脚本改编自 BlenderPro
 '''
 
 import os
+import sys
 import bpy
 import argparse
 import blenderproc as bproc
@@ -20,6 +21,9 @@ from kasal.utils.io_json import load_json2dict, write_dict2json
 import time
 import logging
 import colorsys
+import zipfile
+import subprocess
+
 
 # 配置日志：可通过设置环境变量或修改 level 来关闭 debug 输出
 # 关闭方式1：设置环境变量 export BPROC_LOG_LEVEL=INFO
@@ -28,6 +32,39 @@ logging.basicConfig(
     level=logging.DEBUG,  # 改为 INFO 即可关闭 debug 耗时输出
     format='[%(levelname)s] %(message)s'
 )
+
+current_dir = os.getcwd()
+parent_dir = os.path.dirname(current_dir)
+DIR_TEXTURES = os.path.join(parent_dir, "cc0textures-512")
+ZIP_NAME = "cc0textures-512.zip"
+ZIP_PATH = os.path.join(parent_dir, ZIP_NAME)
+URL = "https://hf-mirror.com/datasets/SEU-WYL/HccePose/resolve/main/cc0textures-512.zip"
+
+def download_cc0textures():
+    if os.path.isdir(DIR_TEXTURES):
+        print(f"目录 '{DIR_TEXTURES}' 已存在，跳过下载。")
+        return
+
+    print(f"目录 '{DIR_TEXTURES}' 不存在，开始下载...")
+    print(f"下载到: {ZIP_PATH}")
+    print(f"解压到: {parent_dir}")
+
+    # 跨平台选择 curl 命令
+    curl_cmd = "curl.exe" if sys.platform == "win32" else "curl"
+    cmd = [curl_cmd, "-L", "-o", ZIP_PATH, "-A", "Mozilla/5.0", URL]
+    try:
+        subprocess.run(cmd, check=True)
+        print("下载完成，开始解压...")
+        with zipfile.ZipFile(ZIP_PATH, 'r') as zipf:
+            zipf.extractall(parent_dir)
+        print(f"解压完成，材质已保存到: {DIR_TEXTURES}")
+    except subprocess.CalledProcessError as e:
+        print(f"curl 下载失败: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"发生错误: {e}", file=sys.stderr)
+        sys.exit(1)
+
 
 def perturb_vertex_colors_hsv(vcol_data, hue_shift=0.0, sat_shift_range=0.1, val_shift_range=0.2):
     """
@@ -63,6 +100,7 @@ def perturb_vertex_colors_hsv(vcol_data, hue_shift=0.0, sat_shift_range=0.1, val
     
 
 if __name__ == '__main__':
+    download_cc0textures()
     parser = argparse.ArgumentParser(description='生成 PBR 数据 (BlenderProc)')
     parser.add_argument('--gpu_id', type=int, required=True, help='GPU 编号，例如 0')
     parser.add_argument('--cc0textures', type=str, required=True, help='cc0textures 材质库路径')
@@ -153,19 +191,19 @@ if __name__ == '__main__':
 
     bproc.renderer.enable_depth_output(activate_antialiasing=False,output_dir=cachedir)
     bproc.renderer.set_max_amount_of_samples(20)
-    #bproc.renderer.set_render_devices(desired_gpu_device_type='CUDA', desired_gpu_ids=[gpu_id])
+    bproc.renderer.set_render_devices(desired_gpu_device_type='CUDA', desired_gpu_ids=[gpu_id])
     #相比CUDA，OptiX 在同等 RTX 显卡上通常有 15%-30% 的性能提升
-    bproc.renderer.set_render_devices(desired_gpu_device_type='OPTIX', desired_gpu_ids = [gpu_id]) 
+    #bproc.renderer.set_render_devices(desired_gpu_device_type='OPTIX', desired_gpu_ids = [gpu_id]) 
 
     for i in tqdm(range(num_scenes)):
         t_start = time.time()
         rand_s = np.random.rand()
 
-        # 物体选择逻辑：50% 概率重复选取 30 个物体（允许重复），否则不重复选取最多 30 个
-        if rand_s > 0.5:
-            idx_l = np.random.choice(models_ids, size=30, replace=True)
-        else:
-            idx_l = np.random.choice(models_ids, size=min(len(models_ids), 30), replace=False)
+        # 物体选择逻辑：50% 概率重复选取 10 个物体（允许重复），否则不重复选取最多 30 个
+        #if rand_s > 0.5:
+        idx_l = np.random.choice(models_ids, size=20, replace=True)
+        #else:
+        #    idx_l = np.random.choice(models_ids, size=min(len(models_ids), 30), replace=False)
         obj_ids = [int(idx) for idx in idx_l]
 
         # 步骤 1：加载 BOP 模型
@@ -188,7 +226,7 @@ if __name__ == '__main__':
             mat = obj.get_materials()[0]
             mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
             mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
-
+            '''
             #增加颜色扰动
             mesh = obj.get_mesh()
             if mesh.vertex_colors:
@@ -197,9 +235,9 @@ if __name__ == '__main__':
                     vcol_data,
                     hue_shift=0.0,           # 完全保留原始色相
                     sat_shift_range=0,       # 中性色（黑、白、灰）RGB 三个分量相等，饱和度 S = 0，调整饱和度会导致偏色
-                    val_shift_range=0.25      # 明度变化 ±0.25，控制深浅
+                    val_shift_range=0.05      # 明度变化 ±0.25，控制深浅
                     )
-            
+            '''
             
             # 性能优化：增加 collision_shape='CONVEX_HULL'
             obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99, collision_shape='CONVEX_HULL')
@@ -253,8 +291,8 @@ if __name__ == '__main__':
         while cam_poses < 20:
             location = bproc.sampler.shell(
                 center=[0, 0, 0],
-                radius_min=0.2,  # 最小物距 0.2 米
-                radius_max=0.7,  # 最大物距 0.7 米
+                radius_min=0.1,  # 最小物距 0.1 米
+                radius_max=0.3,  # 最大物距 0.5 米
                 elevation_min=5, # 相机俯仰角 0°相机完全水平
                 elevation_max=89
             )
@@ -267,8 +305,8 @@ if __name__ == '__main__':
             )
             cam2world_matrix = bproc.math.build_transformation_mat(location, rotation_matrix)
             
-            # 距离物体≥0.3米，相机没有被其他物体严重遮挡
-            if bproc.camera.perform_obstacle_in_view_check(cam2world_matrix, {"min": 0.3}, bop_bvh_tree):
+            # 距离物体≥0.1米，相机没有被其他物体严重遮挡
+            if bproc.camera.perform_obstacle_in_view_check(cam2world_matrix, {"min": 0.1}, bop_bvh_tree):
                 bproc.camera.add_camera_pose(cam2world_matrix, frame=cam_poses)
                 cam_poses += 1
         t5 = time.time()

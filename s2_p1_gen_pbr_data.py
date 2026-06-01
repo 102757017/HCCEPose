@@ -224,8 +224,9 @@ if __name__ == '__main__':
         sampled_target_bop_objs = target_bop_objs
         for obj in sampled_target_bop_objs:
             mat = obj.get_materials()[0]
-            mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
-            mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
+            mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))   #粗糙度
+            mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))    #高光，用于非金属材质
+            #mat.set_principled_shader_value("Metallic", np.random.uniform(0, 1.0))    #金属度，用Metallic时Specular参数通常失效，由金属颜色自动控制高光
             '''
             #增加颜色扰动
             mesh = obj.get_mesh()

@@ -50,7 +50,7 @@ def train_yolo11(task, data_path, gpu_num, epochs, imgsz, batch):
         print("CUDA not available, falling back to CPU.")
     
     if task == "detection":
-        pretrained_weights = "yolo26m.pt"
+        pretrained_weights = "yolo11m.pt"
         task_suffix = "detection"
     elif task == "segmentation":
         pretrained_weights = "yolo11n-seg.pt"

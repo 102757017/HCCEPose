@@ -8,7 +8,7 @@ unzip -o -q blenderproc.zip
 
 pip install uv
 #uv sync --extra cpu --extra s1 --extra s2 --extra s3 --extra s4 --extra s5
-uv pip install --system ".[s2]"
+#uv pip install --system ".[s2]"
 
 chmod 777 ./scripts/install_system_deps.sh
 ./scripts/install_system_deps.sh

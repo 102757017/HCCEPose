@@ -7,10 +7,8 @@ unzip -o -q blenderproc.zip
 
 
 pip install uv
-#uv sync --group train --extra cpu
-mv -f pyproject_kaggle.toml pyproject.toml
-uv pip install -r pyproject.toml --no-progress --system
-
+#uv sync --extra cpu --extra s1 --extra s2 --extra s3 --extra s4 --extra s5
+uv pip install --system ".[s2]"
 
 chmod 777 ./scripts/install_system_deps.sh
 ./scripts/install_system_deps.sh

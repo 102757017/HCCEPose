@@ -32,7 +32,6 @@ cuda =[
     "fvcore==0.1.5.post20221221",
 ]
 
-[dependency-groups]
 s1 =[
     "pymeshlab>=2023.12.post1",
     "kasal-6d==0.1.4",
@@ -70,6 +69,7 @@ s5 =[
 	"onnx",
 ]
 
+[dependency-groups]
 back =[
     "cython==3.2.1",
     "glumpy>=1.2.1",
@@ -145,3 +145,6 @@ torchaudio =[
     { index = "pytorch-cpu", extra = "cpu" },
     { index = "pytorch-cuda", extra = "cuda" }
 ]
+
+[tool.setuptools]
+packages = []  # 强制关闭自动扫描，什么都不打包，只装依赖

@@ -44,6 +44,9 @@ s2 =[
     "pypng>=0.20220715.0",
     "pyrender>=0.1.45",
     "bpy==3.6.0",
+    "rich==14.2.0",
+    "h5py==3.15.1",
+    "scikit-image==0.25.0",
     "kasal-6d==0.1.4",
     "pymeshlab>=2023.12.post1",
 ]
@@ -73,7 +76,6 @@ s5 =[
 back =[
     "cython==3.2.1",
     "glumpy>=1.2.1",
-    "h5py==3.15.1",
     "huggingface-hub[hf-transfer]==0.36.0",
     "imageio==2.37.2",
     "imgaug>=0.4.0",
@@ -89,7 +91,6 @@ back =[
     "pypng>=0.20220715.0",
     "pyrender>=0.1.45",
     "pytz>=2026.2",
-    "rich==14.2.0",
     "scipy==1.15.3",
     "setuptools<70.0.0",
     "tensorboard>=2.20.0",

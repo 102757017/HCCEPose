@@ -22,6 +22,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Windows venv 的激活脚本在 Scripts/，Linux venv 在 bin/
 activate_venv() {
+    if [ -n "${_VENV_ACTIVATED:-}" ]; then return 0; fi
     if [ -f "$REPO_ROOT/.venv/Scripts/activate" ]; then
         # shellcheck disable=SC1091
         source "$REPO_ROOT/.venv/Scripts/activate"
@@ -31,6 +32,7 @@ activate_venv() {
     else
         echo "[warn] 未找到 .venv，沿用当前解释器: $(command -v python)" >&2
     fi
+    _VENV_ACTIVATED=1
 }
 
 pause_script() {
@@ -78,6 +80,18 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# 检查顺序：脚本/数据集是廉价检查，放前面；材质库放最后——缺失时可能触发
+# 585MB 的大下载，别让前面的路径拼写错误白白浪费这次下载。
+
+# 脚本：只校验目录不够（如 --script_path ../xxx 会把目录指到仓库外、文件不存在），
+# 必须确认文件本身存在
+_cscript="$(abspath "$(dirname "$script_path")")" || { echo "错误: 脚本目录不存在: $script_path" >&2; exit 1; }
+script_path="$_cscript/$(basename "$script_path")"
+[ -f "$script_path" ] || { echo "错误: 脚本文件不存在: $script_path" >&2; exit 1; }
+
+_cdataset="$(abspath "$dataset_path")" || { echo "错误: 数据集目录不存在: $dataset_path" >&2; exit 1; }
+dataset_path="$_cdataset"
+
 # 路径统一转绝对路径：python 脚本会 chdir，相对路径会失效。
 # 材质库缺失时先自动下载（与直接运行 python 脚本的行为对齐），仍失败才报错。
 if _cc0textures="$(abspath "$cc0textures")"; then
@@ -98,12 +112,6 @@ else
     _cc0textures="$(abspath "$cc0textures")" || { echo "错误: 自动下载后仍未找到材质库: $cc0textures" >&2; exit 1; }
     cc0textures="$_cc0textures"
 fi
-
-_cdataset="$(abspath "$dataset_path")" || { echo "错误: 数据集目录不存在: $dataset_path" >&2; exit 1; }
-dataset_path="$_cdataset"
-
-_cscript="$(abspath "$(dirname "$script_path")")" || { echo "错误: 脚本不存在: $script_path" >&2; exit 1; }
-script_path="$_cscript/$(basename "$script_path")"
 
 activate_venv
 

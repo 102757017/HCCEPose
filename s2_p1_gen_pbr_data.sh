@@ -7,7 +7,7 @@
 # 选项:
 #   --gpu_id N         EGL 使用的 GPU 编号（默认 0）
 #   --scene_num N      渲染场景数（默认 42）
-#   --cc0textures PATH 材质库路径（默认 <仓库根>/cc0textures-512）
+#   --cc0textures PATH 材质库路径（默认 <仓库根>/cc0textures-512，缺失时自动下载）
 #   --dataset_path PATH 数据集根目录（默认 <仓库根>/demo-bin-picking）
 #   --script_path PATH s2_p1_gen_pbr_data.py 路径（默认 <仓库根>/s2_p1_gen_pbr_data.py）
 #   --no-pause         结束后不等待按键（供其他脚本调用时使用）
@@ -50,7 +50,7 @@ usage() {
 选项:
   --gpu_id N         EGL 使用的 GPU 编号（默认 0）
   --scene_num N      渲染场景数（默认 42）
-  --cc0textures PATH 材质库路径（默认 <仓库根>/cc0textures-512）
+  --cc0textures PATH 材质库路径（默认 <仓库根>/cc0textures-512，缺失时自动下载）
   --dataset_path PATH 数据集根目录（默认 <仓库根>/demo-bin-picking）
   --script_path PATH s2_p1_gen_pbr_data.py 路径（默认 <仓库根>/s2_p1_gen_pbr_data.py）
   --no-pause         结束后不等待按键（供其他脚本调用时使用）
@@ -78,9 +78,26 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# 路径统一转绝对路径：python 脚本会 chdir，相对路径会失效
-_cc0textures="$(abspath "$cc0textures")" || { echo "错误: 材质库目录不存在: $cc0textures" >&2; exit 1; }
-cc0textures="$_cc0textures"
+# 路径统一转绝对路径：python 脚本会 chdir，相对路径会失效。
+# 材质库缺失时先自动下载（与直接运行 python 脚本的行为对齐），仍失败才报错。
+if _cc0textures="$(abspath "$cc0textures")"; then
+    cc0textures="$_cc0textures"
+else
+    echo "[info] 材质库不存在，尝试自动下载: $cc0textures"
+    # 绝对路径（/posix 或 C:/ 风格）原样传给下载器；相对路径先锚定到当前 cwd
+    case "$cc0textures" in
+        /*|[A-Za-z]:[\\/]*) _cc_target="$cc0textures" ;;
+        *)                  _cc_target="$(pwd)/$cc0textures" ;;
+    esac
+    activate_venv
+    if ! python "$REPO_ROOT/s2_p0b_download_cc0textures_512.py" "$_cc_target"; then
+        echo "错误: 材质库自动下载失败。可手动下载 cc0textures-512.zip 解压到 $_cc_target，" \
+             "或用环境变量 CC0TEXTURES_URL 指定镜像后重试" >&2
+        exit 1
+    fi
+    _cc0textures="$(abspath "$cc0textures")" || { echo "错误: 自动下载后仍未找到材质库: $cc0textures" >&2; exit 1; }
+    cc0textures="$_cc0textures"
+fi
 
 _cdataset="$(abspath "$dataset_path")" || { echo "错误: 数据集目录不存在: $dataset_path" >&2; exit 1; }
 dataset_path="$_cdataset"

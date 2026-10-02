@@ -13,7 +13,7 @@
 #
 # 选项:
 #   --dataset_path PATH  数据集根目录（默认 <仓库根>/demo-bin-picking）
-#   --cc0textures PATH  材质库路径（默认 <仓库根>/cc0textures-512）
+#   --cc0textures PATH  材质库路径（默认 <仓库根>/cc0textures-512，缺失时自动下载）
 #   --scene_num N       渲染场景数（默认 2）
 #   --gpu_id N          渲染使用的 GPU（默认 0）
 #   --gpu_num N         YOLO 训练 GPU 数（默认 1）
@@ -59,7 +59,7 @@ usage() {
 
 选项:
   --dataset_path PATH  数据集根目录（默认 <仓库根>/demo-bin-picking）
-  --cc0textures PATH  材质库路径（默认 <仓库根>/cc0textures-512）
+  --cc0textures PATH  材质库路径（默认 <仓库根>/cc0textures-512，缺失时自动下载）
   --scene_num N       渲染场景数（默认 2）
   --gpu_id N          渲染使用的 GPU（默认 0）
   --gpu_num N         YOLO 训练 GPU 数（默认 1）

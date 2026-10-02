@@ -36,34 +36,9 @@ logging.basicConfig(
 current_dir = os.getcwd()
 parent_dir = os.path.dirname(current_dir)
 DIR_TEXTURES = os.path.join(parent_dir, "cc0textures-512")
-ZIP_NAME = "cc0textures-512.zip"
-ZIP_PATH = os.path.join(parent_dir, ZIP_NAME)
-URL = "https://hf-mirror.com/datasets/SEU-WYL/HccePose/resolve/main/cc0textures-512.zip"
 
-def download_cc0textures():
-    if os.path.isdir(DIR_TEXTURES):
-        print(f"目录 '{DIR_TEXTURES}' 已存在，跳过下载。")
-        return
-
-    print(f"目录 '{DIR_TEXTURES}' 不存在，开始下载...")
-    print(f"下载到: {ZIP_PATH}")
-    print(f"解压到: {parent_dir}")
-
-    # 跨平台选择 curl 命令
-    curl_cmd = "curl.exe" if sys.platform == "win32" else "curl"
-    cmd = [curl_cmd, "-L", "-o", ZIP_PATH, "-A", "Mozilla/5.0", URL]
-    try:
-        subprocess.run(cmd, check=True)
-        print("下载完成，开始解压...")
-        with zipfile.ZipFile(ZIP_PATH, 'r') as zipf:
-            zipf.extractall(parent_dir)
-        print(f"解压完成，材质已保存到: {DIR_TEXTURES}")
-    except subprocess.CalledProcessError as e:
-        print(f"curl 下载失败: {e}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"发生错误: {e}", file=sys.stderr)
-        sys.exit(1)
+# 下载逻辑抽到了独立模块（纯 stdlib，不依赖 bpy），与 s2_p1_gen_pbr_data.sh wrapper 共用
+from s2_p0b_download_cc0textures_512 import download_cc0textures  # noqa: E402
 
 
 def perturb_vertex_colors_hsv(vcol_data, hue_shift=0.0, sat_shift_range=0.1, val_shift_range=0.2):
@@ -100,7 +75,7 @@ def perturb_vertex_colors_hsv(vcol_data, hue_shift=0.0, sat_shift_range=0.1, val
     
 
 if __name__ == '__main__':
-    download_cc0textures()
+    download_cc0textures(DIR_TEXTURES)
     parser = argparse.ArgumentParser(description='生成 PBR 数据 (BlenderProc)')
     parser.add_argument('--gpu_id', type=int, required=True, help='GPU 编号，例如 0')
     parser.add_argument('--cc0textures', type=str, required=True, help='cc0textures 材质库路径')
